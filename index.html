@@ -521,38 +521,39 @@ document.addEventListener('keydown',e=>{
   if(['1','2','3','4','5'].includes(e.key))placeCard(parseInt(e.key));
 });
 
-// Scoring
-function scoreSchools(){
-  const W={5:10,4:5,3:0,2:-3,1:-10};
-  const cardMap={};
-  cards.forEach((c,i)=>{cardMap[c.name]=placements[i]||3;});
-  return SCHOOLS.map(school=>{
-    let score=0,maxP=0,dealBroken=false;
-    school.tags.forEach(tag=>{
-      const r=cardMap[tag];if(r===undefined)return;
-      if(r===1)dealBroken=true;
-      score+=W[r];maxP+=W[5];
+// ── AI BACKEND MATCHING ──────────────────────────────────────
+async function callBackend(){
+  const must=[],like=[],dontCare=[],preferNot=[],dontLike=[];
+  cards.forEach((c,i)=>{
+    const cat=placements[i];
+    if(cat===5)must.push(c.name);
+    else if(cat===4)like.push(c.name);
+    else if(cat===3)dontCare.push(c.name);
+    else if(cat===2)preferNot.push(c.name);
+    else if(cat===1)dontLike.push(c.name);
+  });
+  try{
+    const res=await fetch('/api/match',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mustHave:must,wouldLike:like,dontCare,preferNot,dontLike})
     });
-    if(dealBroken)score=Math.min(score,-50);
-    const fitPercent=dealBroken?Math.floor(Math.random()*15+5)
-      :Math.min(99,Math.max(10,Math.round(50+(score/(maxP||1))*49)));
-    const matchedTags=school.tags.filter(t=>cardMap[t]>=4).slice(0,5);
-    return{...school,fitPercent,matchedTags,dealBroken};
-  }).sort((a,b)=>b.fitPercent-a.fitPercent).slice(0,8);
+    if(!res.ok) throw new Error(`Server error: ${res.status}`);
+    const data=await res.json();
+    showResults(data.schools,must,like);
+  }catch(err){
+    showResults(null,[],[],err.toString());
+  }
 }
 
 function finishSorting(){
   showScreen('loading');
-  ['ls1','ls2','ls3','ls4'].forEach((id,i)=>setTimeout(()=>document.getElementById(id).classList.add('done'),i*700+300));
-  setTimeout(()=>{
-    const results=scoreSchools();
-    const must=[],like=[];
-    cards.forEach((c,i)=>{if(placements[i]===5)must.push(c.name);else if(placements[i]===4)like.push(c.name);});
-    showResults(results,must,like);
-  },3200);
+  ['ls1','ls2','ls3','ls4'].forEach((id,i)=>
+    setTimeout(()=>document.getElementById(id).classList.add('done'),i*800+400));
+  setTimeout(callBackend,1400);
 }
 
-function showResults(schools,must,like){
+function showResults(schools,must,like,error){
   showScreen('results');
   const colors=['#2a9d5c','#2d5be3','#9a9590','#e07b2a','#c8453a'];
   const labels=['Must Have','Would Like','Neutral','Prefer Not',"Don't Like"];
@@ -562,27 +563,28 @@ function showResults(schools,must,like){
     ...must.slice(0,10).map(p=>`<div class="pill pill-must">★ ${p}</div>`),
     ...like.slice(0,8).map(p=>`<div class="pill pill-like">↑ ${p}</div>`)
   ].join('');
+  const list=document.getElementById('schoolsList');
+  if(error||!schools){
+    list.innerHTML=`<div class="err-box"><strong>Could not load AI recommendations.</strong><br>Please ensure your Anthropic API key is configured in Vercel environment variables.<br><br><small style="opacity:.55">${error||'Unknown error'}</small></div>`;
+    return;
+  }
   const fitColor=pct=>pct>=80?'#2a9d5c':pct>=65?'#2d5be3':pct>=50?'#e07b2a':'#c8453a';
-  document.getElementById('schoolsList').innerHTML=schools.map((s,i)=>{
-    const tags=s.matchedTags.length?s.matchedTags:s.tags.slice(0,4);
-    const why=s.dealBroken
-      ?`This school has traits you listed as deal-breakers and may not be a strong fit.`
-      :`Matches ${s.matchedTags.length} of your top priorities${s.matchedTags.length?', including '+s.matchedTags.slice(0,2).join(' and '):''}.`;
-    return`<div class="s-card">
+  list.innerHTML=schools.map((s,i)=>`
+    <div class="s-card">
       <div class="s-bar-wrap"><div class="s-bar" style="width:0%;background:${fitColor(s.fitPercent)}" data-pct="${s.fitPercent}"></div></div>
       <div class="s-inner">
         <div class="s-rank">${String(i+1).padStart(2,'0')}</div>
         <div class="s-info">
           <div class="s-name">${s.name}</div>
           <div class="s-loc">📍 ${s.location}</div>
-          <div class="s-tags">${tags.map(t=>`<span class="s-tag">${t}</span>`).join('')}</div>
+          <div class="s-tags">${(s.tags||[]).map(t=>`<span class="s-tag">${t}</span>`).join('')}</div>
         </div>
         <div class="s-pct"><div class="s-pct-num" style="color:${fitColor(s.fitPercent)}">${s.fitPercent}%</div><div class="s-pct-lbl">FIT SCORE</div></div>
       </div>
-      <div class="s-why">${why}</div>
-    </div>`;
-  }).join('');
-  requestAnimationFrame(()=>setTimeout(()=>document.querySelectorAll('.s-bar').forEach(b=>b.style.width=b.dataset.pct+'%'),120));
+      <div class="s-why">${s.why}</div>
+    </div>`).join('');
+  requestAnimationFrame(()=>setTimeout(()=>
+    document.querySelectorAll('.s-bar').forEach(b=>b.style.width=b.dataset.pct+'%'),120));
 }
 
 function resetApp(){
