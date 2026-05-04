@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>College 360</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f2eb;--surface:#fff;--ink:#1a1814;--muted:#8a8680;--rule:#ddd9d0;
+  --c1:#c8453a;--c2:#e07b2a;--c3:#9a9590;--c4:#2d5be3;--c5:#2a9d5c;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden}
+.screen{display:none;min-height:100vh}
+.screen.active{display:flex;flex-direction:column}
+#splash{align-items:center;justify-content:center;background:#1a1814;position:relative;overflow:hidden}
+#splash::before{content:'';position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(200,69,58,.25) 0%,transparent 70%);top:-200px;right:-200px}
+#splash::after{content:'';position:absolute;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(45,91,227,.18) 0%,transparent 70%);bottom:-100px;left:-100px}
+.splash-inner{text-align:center;z-index:1;padding:40px}
+.splash-logo{font-family:'Bebas Neue',sans-serif;font-size:clamp(64px,12vw,120px);color:#fff;line-height:.9;letter-spacing:2px}
+.splash-logo span{color:var(--c1)}
+.splash-sub{font-size:14px;color:rgba(255,255,255,.45);letter-spacing:4px;text-transform:uppercase;margin-top:12px;font-weight:300}
+.splash-desc{color:rgba(255,255,255,.65);max-width:420px;margin:32px auto 48px;line-height:1.7;font-size:16px}
+.btn-primary{background:var(--c1);color:#fff;border:none;padding:18px 52px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;border-radius:4px;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 24px rgba(200,69,58,.4)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(200,69,58,.55)}
+.splash-count{color:rgba(255,255,255,.3);font-size:13px;margin-top:20px;font-family:'DM Mono',monospace}
+#sorting{background:var(--bg);align-items:center;padding:0 20px}
+.top-bar{width:100%;max-width:700px;display:flex;align-items:center;justify-content:space-between;padding:20px 0 10px}
+.top-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--ink);letter-spacing:1px}
+.top-logo span{color:var(--c1)}
+.progress-wrap{display:flex;align-items:center;gap:10px}
+.progress-bar{width:140px;height:4px;background:var(--rule);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:var(--c1);border-radius:2px;transition:width .4s ease}
+.progress-label{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)}
+.card-stage{flex:1;display:flex;align-items:center;justify-content:center;width:100%;max-width:700px;position:relative;min-height:300px}
+.card-ghost{position:absolute;width:320px;height:200px;border-radius:16px;background:var(--surface);border:2px solid var(--rule);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.card-ghost:nth-child(1){transform:rotate(3deg) translateY(6px);opacity:.35}
+.card-ghost:nth-child(2){transform:rotate(-2deg) translateY(3px);opacity:.6}
+.main-card{width:320px;min-height:200px;background:var(--surface);border-radius:16px;border:2px solid var(--rule);box-shadow:0 8px 40px rgba(0,0,0,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 28px 28px;position:relative;z-index:10;cursor:grab;user-select:none;transition:box-shadow .2s}
+.main-card:active{cursor:grabbing}
+.card-cat-tag{position:absolute;top:14px;left:18px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace}
+.card-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(22px,5vw,38px);text-align:center;line-height:1.05;color:var(--ink)}
+.card-hint{position:absolute;bottom:13px;font-size:11px;color:var(--muted);letter-spacing:1px}
+.kbd-hint{position:absolute;top:14px;right:18px;font-family:'DM Mono',monospace;font-size:10px;color:var(--rule);letter-spacing:1px}
+.zones-row{width:100%;max-width:820px;display:flex;gap:8px;padding:16px 0 28px;justify-content:center;flex-wrap:wrap}
+.zone{flex:1;min-width:110px;max-width:148px;border-radius:12px;border:2px dashed transparent;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:all .2s;text-align:center}
+.zone[data-cat="1"]{background:rgba(200,69,58,.07);border-color:rgba(200,69,58,.2)}
+.zone[data-cat="2"]{background:rgba(224,123,42,.07);border-color:rgba(224,123,42,.2)}
+.zone[data-cat="3"]{background:rgba(154,149,144,.07);border-color:rgba(154,149,144,.2)}
+.zone[data-cat="4"]{background:rgba(45,91,227,.07);border-color:rgba(45,91,227,.2)}
+.zone[data-cat="5"]{background:rgba(42,157,92,.07);border-color:rgba(42,157,92,.2)}
+.zone.dragover[data-cat="1"]{background:rgba(200,69,58,.18);border-color:var(--c1);transform:scale(1.06)}
+.zone.dragover[data-cat="2"]{background:rgba(224,123,42,.18);border-color:var(--c2);transform:scale(1.06)}
+.zone.dragover[data-cat="3"]{background:rgba(154,149,144,.18);border-color:var(--c3);transform:scale(1.06)}
+.zone.dragover[data-cat="4"]{background:rgba(45,91,227,.18);border-color:var(--c4);transform:scale(1.06)}
+.zone.dragover[data-cat="5"]{background:rgba(42,157,92,.18);border-color:var(--c5);transform:scale(1.06)}
+.zone-emoji{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff}
+.zone[data-cat="1"] .zone-emoji{background:var(--c1)}
+.zone[data-cat="2"] .zone-emoji{background:var(--c2)}
+.zone[data-cat="3"] .zone-emoji{background:var(--c3)}
+.zone[data-cat="4"] .zone-emoji{background:var(--c4)}
+.zone[data-cat="5"] .zone-emoji{background:var(--c5)}
+.zone-lbl{font-size:11px;font-weight:600;letter-spacing:.4px;line-height:1.3}
+.zone[data-cat="1"] .zone-lbl{color:var(--c1)}
+.zone[data-cat="2"] .zone-lbl{color:var(--c2)}
+.zone[data-cat="3"] .zone-lbl{color:var(--c3)}
+.zone[data-cat="4"] .zone-lbl{color:var(--c4)}
+.zone[data-cat="5"] .zone-lbl{color:var(--c5)}
+.zone-cnt{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+@keyframes zFlash{0%{transform:scale(1.08)}100%{transform:scale(1)}}
+.zone.placed{animation:zFlash .25s ease}
+@keyframes cardFly{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.75) translateY(-24px)}}
+.main-card.flying{animation:cardFly .25s ease forwards;pointer-events:none}
+@keyframes cardIn{0%{opacity:0;transform:scale(.88) translateY(18px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+.main-card.entering{animation:cardIn .3s ease forwards}
+#loading{align-items:center;justify-content:center;background:#1a1814}
+.loading-inner{text-align:center;padding:40px}
+.loading-title{font-family:'Bebas Neue',sans-serif;font-size:52px;color:#fff;line-height:1;margin-bottom:8px}
+.loading-sub{color:rgba(255,255,255,.45);font-size:14px;margin-bottom:40px}
+.dots{display:flex;justify-content:center;gap:8px;margin-bottom:36px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--c1);animation:bounce 1.2s infinite ease-in-out}
+.dot:nth-child(2){animation-delay:.2s;background:var(--c4)}
+.dot:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+.load-steps{text-align:left;max-width:360px;margin:0 auto}
+.load-step{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07);color:rgba(255,255,255,.35);font-size:14px;transition:color .4s}
+.load-step.done{color:rgba(255,255,255,.85)}
+.step-ck{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;transition:all .4s}
+.load-step.done .step-ck{background:var(--c5);border-color:var(--c5);color:#fff}
+#results{background:var(--bg)}
+.res-header{background:#1a1814;padding:44px 32px 52px;text-align:center}
+.res-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,8vw,74px);color:#fff;line-height:.95}
+.res-title span{color:var(--c1)}
+.res-sub{color:rgba(255,255,255,.4);font-size:13px;margin-top:10px;letter-spacing:3px;text-transform:uppercase}
+.res-body{max-width:800px;margin:0 auto;padding:32px 20px 64px}
+.sum-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:32px;padding:20px;background:var(--surface);border-radius:14px;border:1.5px solid var(--rule)}
+.sum-item{flex:1;min-width:80px;text-align:center}
+.sum-num{font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:1}
+.sum-lbl{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:3px}
+.sec-label{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:14px}
+.pills{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:32px}
+.pill{padding:5px 14px;border-radius:100px;font-size:12px;font-weight:500}
+.pill-must{background:rgba(42,157,92,.12);color:var(--c5);border:1px solid rgba(42,157,92,.28)}
+.pill-like{background:rgba(45,91,227,.1);color:var(--c4);border:1px solid rgba(45,91,227,.22)}
+.schools{display:flex;flex-direction:column;gap:14px}
+.s-card{background:var(--surface);border-radius:16px;border:1.5px solid var(--rule);overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.05);transition:transform .2s,box-shadow .2s}
+.s-card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.1)}
+.s-bar-wrap{height:4px;background:var(--rule)}
+.s-bar{height:100%;transition:width 1s ease}
+.s-inner{display:flex;align-items:center;padding:20px 24px;gap:18px}
+.s-rank{font-family:'Bebas Neue',sans-serif;font-size:44px;color:var(--rule);line-height:1;min-width:46px;text-align:center}
+.s-info{flex:1}
+.s-name{font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1.1;color:var(--ink)}
+.s-loc{font-size:13px;color:var(--muted);margin-top:2px}
+.s-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.s-tag{font-size:11px;padding:3px 10px;border-radius:100px;background:var(--bg);color:var(--muted);border:1px solid var(--rule)}
+.s-pct{text-align:right}
+.s-pct-num{font-family:'Bebas Neue',sans-serif;font-size:46px;line-height:1}
+.s-pct-lbl{font-size:10px;color:var(--muted);letter-spacing:1.5px}
+.s-why{padding:0 24px 18px;font-size:13px;color:var(--muted);line-height:1.7;border-top:1px solid var(--rule);padding-top:14px}
+.res-actions{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
+.btn-sec{flex:1;min-width:150px;padding:16px 20px;border-radius:8px;border:2px solid var(--ink);background:transparent;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;cursor:pointer;transition:all .2s;color:var(--ink)}
+.btn-sec:hover{background:var(--ink);color:var(--bg)}
+.btn-acc{flex:1;min-width:150px;padding:16px 20px;border-radius:8px;border:2px solid var(--c1);background:var(--c1);color:#fff;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;cursor:pointer;transition:all .2s}
+.btn-acc:hover{background:#b03830;border-color:#b03830}
+@media(max-width:480px){.zones-row{gap:5px}.zone{min-width:88px;padding:10px 5px}.zone-lbl{font-size:10px}.main-card{width:290px}}
+</style>
+</head>
+<body>
+
+<div id="splash" class="screen active">
+  <div class="splash-inner">
+    <div class="splash-logo">College<span>360</span></div>
+    <div class="splash-sub">Find Your Perfect Match</div>
+    <p class="splash-desc">Sort through topics that matter to you. We'll match you with the colleges that fit your life — not just your grades.</p>
+    <button class="btn-primary" onclick="startSorting()">START SORTING</button>
+    <div class="splash-count" id="totalCount"></div>
+  </div>
+</div>
+
+<div id="sorting" class="screen">
+  <div class="top-bar">
+    <div class="top-logo">College<span>360</span></div>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="pFill" style="width:0%"></div></div>
+      <div class="progress-label" id="pLabel">0 / 0</div>
+    </div>
+  </div>
+  <div class="card-stage">
+    <div class="card-ghost"></div>
+    <div class="card-ghost"></div>
+    <div class="main-card" id="mainCard" draggable="true">
+      <div class="card-cat-tag" id="cardTag"></div>
+      <div class="kbd-hint">PRESS 1–5</div>
+      <div class="card-name" id="cardName"></div>
+      <div class="card-hint">drag or tap a category below</div>
+    </div>
+  </div>
+  <div class="zones-row">
+    <div class="zone" data-cat="1" onclick="placeCard(1)"><div class="zone-emoji">✕</div><div class="zone-lbl">Don't Like At All</div><div class="zone-cnt" id="cnt1">0 cards</div></div>
+    <div class="zone" data-cat="2" onclick="placeCard(2)"><div class="zone-emoji">↓</div><div class="zone-lbl">Would Prefer Not</div><div class="zone-cnt" id="cnt2">0 cards</div></div>
+    <div class="zone" data-cat="3" onclick="placeCard(3)"><div class="zone-emoji">–</div><div class="zone-lbl">Don't Really Care</div><div class="zone-cnt" id="cnt3">0 cards</div></div>
+    <div class="zone" data-cat="4" onclick="placeCard(4)"><div class="zone-emoji">↑</div><div class="zone-lbl">Would Like</div><div class="zone-cnt" id="cnt4">0 cards</div></div>
+    <div class="zone" data-cat="5" onclick="placeCard(5)"><div class="zone-emoji">★</div><div class="zone-lbl">Must Have</div><div class="zone-cnt" id="cnt5">0 cards</div></div>
+  </div>
+</div>
+
+<div id="loading" class="screen">
+  <div class="loading-inner">
+    <div class="loading-title">Analyzing<br>Your Profile</div>
+    <div class="loading-sub">Matching against our school database</div>
+    <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    <div class="load-steps">
+      <div class="load-step" id="ls1"><div class="step-ck">✓</div><span>Processing your preferences</span></div>
+      <div class="load-step" id="ls2"><div class="step-ck">✓</div><span>Weighting must-haves vs. deal-breakers</span></div>
+      <div class="load-step" id="ls3"><div class="step-ck">✓</div><span>Scoring schools against your profile</span></div>
+      <div class="load-step" id="ls4"><div class="step-ck">✓</div><span>Ranking your top matches</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="results" class="screen">
+  <div class="res-header">
+    <div class="res-title">Your Top<br><span>College Matches</span></div>
+    <div class="res-sub">Based on your College 360 Profile</div>
+  </div>
+  <div class="res-body">
+    <div class="sum-strip" id="sumStrip"></div>
+    <div class="sec-label">Your Must-Haves & Top Priorities</div>
+    <div class="pills" id="pills"></div>
+    <div class="sec-label">Your Matched Schools</div>
+    <div class="schools" id="schoolsList"></div>
+    <div class="res-actions">
+      <button class="btn-sec" onclick="resetApp()">START OVER</button>
+      <button class="btn-acc" onclick="window.print()">SAVE RESULTS</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// COLLEGE 360 — DRAFT 2
+// All changes from audit applied. Rule-based matching engine.
+// Categories: Fields of Study, Location, Campus & Setting,
+//   Activities & Involvement, Resources & Support,
+//   Campus Culture, Learning Environment
+// ================================================================
+
+const ALL_CARDS=[
+  // FIELDS OF STUDY (49)
+  {name:"Sports Medicine & Kinesiology",cat:"Fields of Study"},
+  {name:"International Relations",cat:"Fields of Study"},
+  {name:"Engineering",cat:"Fields of Study"},
+  {name:"Fashion Design",cat:"Fields of Study"},
+  {name:"Sociology",cat:"Fields of Study"},
+  {name:"Business",cat:"Fields of Study"},
+  {name:"Philosophy",cat:"Fields of Study"},
+  {name:"Sports Management",cat:"Fields of Study"},
+  {name:"Communications & Journalism",cat:"Fields of Study"},
+  {name:"Liberal Arts",cat:"Fields of Study"},
+  {name:"Psychology",cat:"Fields of Study"},
+  {name:"Physics",cat:"Fields of Study"},
+  {name:"Geology",cat:"Fields of Study"},
+  {name:"Education / Teaching",cat:"Fields of Study"},
+  {name:"Public Health",cat:"Fields of Study"},
+  {name:"Criminal Justice",cat:"Fields of Study"},
+  {name:"Dance",cat:"Fields of Study"},
+  {name:"Statistics & Analytics",cat:"Fields of Study"},
+  {name:"Foreign Language & Linguistics",cat:"Fields of Study"},
+  {name:"History",cat:"Fields of Study"},
+  {name:"Film",cat:"Fields of Study"},
+  {name:"Animal Science",cat:"Fields of Study"},
+  {name:"English",cat:"Fields of Study"},
+  {name:"Environmental Science",cat:"Fields of Study"},
+  {name:"Chemistry",cat:"Fields of Study"},
+  {name:"Economics",cat:"Fields of Study"},
+  {name:"Culinary Arts",cat:"Fields of Study"},
+  {name:"Astronomy",cat:"Fields of Study"},
+  {name:"Math",cat:"Fields of Study"},
+  {name:"Political Science",cat:"Fields of Study"},
+  {name:"Music",cat:"Fields of Study"},
+  {name:"Nursing",cat:"Fields of Study"},
+  {name:"Hospitality Management",cat:"Fields of Study"},
+  {name:"Drama / Theater",cat:"Fields of Study"},
+  {name:"Construction Management",cat:"Fields of Study"},
+  {name:"Biology",cat:"Fields of Study"},
+  {name:"Neuroscience",cat:"Fields of Study"},
+  {name:"Computer Science",cat:"Fields of Study"},
+  {name:"Agriculture & Sustainability",cat:"Fields of Study"},
+  {name:"Ethnic & Cultural Studies",cat:"Fields of Study"},
+  {name:"Military Studies",cat:"Fields of Study"},
+  {name:"Product / Industrial Design",cat:"Fields of Study"},
+  {name:"Social Entrepreneurship",cat:"Fields of Study"},
+  {name:"Global Studies",cat:"Fields of Study"},
+  {name:"Art",cat:"Fields of Study"},
+  {name:"Architecture",cat:"Fields of Study"},
+  {name:"Pre-Law",cat:"Fields of Study"},
+  {name:"Pre-Med / Health Sciences",cat:"Fields of Study"},
+  {name:"Graphic Design / UX Design",cat:"Fields of Study"},
+
+  // LOCATION (9)
+  {name:"Rocky Mountains (CO, ID, MT, UT, WY)",cat:"Location"},
+  {name:"International",cat:"Location"},
+  {name:"Southwest (AZ, NM, OK, TX)",cat:"Location"},
+  {name:"Great Lakes (MI, IL, IN, OH, WI)",cat:"Location"},
+  {name:"Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)",cat:"Location"},
+  {name:"Mid-Atlantic (DE, MD, NJ, NY, PA, DC)",cat:"Location"},
+  {name:"New England (CT, ME, MA, NH, RI, VT)",cat:"Location"},
+  {name:"Plains (IA, KS, MN, MO, NE, ND, SD)",cat:"Location"},
+  {name:"West Coast (AK, CA, HI, NV, OR, WA)",cat:"Location"},
+
+  // CAMPUS & SETTING (20)
+  {name:"Bike Friendly Campus",cat:"Campus & Setting"},
+  {name:"Lots of Sunlight",cat:"Campus & Setting"},
+  {name:"Modern Facilities",cat:"Campus & Setting"},
+  {name:"Far From Home",cat:"Campus & Setting"},
+  {name:"Close to Home",cat:"Campus & Setting"},
+  {name:"College Town",cat:"Campus & Setting"},
+  {name:"Suburban Setting",cat:"Campus & Setting"},
+  {name:"Rural Setting",cat:"Campus & Setting"},
+  {name:"City Campus",cat:"Campus & Setting"},
+  {name:"Scenic / Beautiful Campus",cat:"Campus & Setting"},
+  {name:"Great Dorms",cat:"Campus & Setting"},
+  {name:"Snow",cat:"Campus & Setting"},
+  {name:"Warm Weather",cat:"Campus & Setting"},
+  {name:"Residential Campus",cat:"Campus & Setting"},
+  {name:"Things to Do on Weekends",cat:"Campus & Setting"},
+  {name:"Campus Safety",cat:"Campus & Setting"},
+  {name:"Public Transportation Access",cat:"Campus & Setting"},
+  {name:"Small College",cat:"Campus & Setting"},
+  {name:"Medium College",cat:"Campus & Setting"},
+  {name:"Large College",cat:"Campus & Setting"},
+
+  // ACTIVITIES & INVOLVEMENT (10)
+  {name:"Good Gym / Rec Center",cat:"Activities & Involvement"},
+  {name:"Cultural Events",cat:"Activities & Involvement"},
+  {name:"Community Service",cat:"Activities & Involvement"},
+  {name:"Clubs",cat:"Activities & Involvement"},
+  {name:"Varsity Sports",cat:"Activities & Involvement"},
+  {name:"Intramural Sports",cat:"Activities & Involvement"},
+  {name:"Research Opportunities",cat:"Activities & Involvement"},
+  {name:"Music / Performing Arts Scene",cat:"Activities & Involvement"},
+  {name:"ROTC",cat:"Activities & Involvement"},
+  {name:"Study Abroad",cat:"Activities & Involvement"},
+
+  // RESOURCES & SUPPORT (13)
+  {name:"Tutoring",cat:"Resources & Support"},
+  {name:"Career Services & Job Placement",cat:"Resources & Support"},
+  {name:"Internship Programs",cat:"Resources & Support"},
+  {name:"Pre-Med Advising",cat:"Resources & Support"},
+  {name:"Honors College",cat:"Resources & Support"},
+  {name:"Disability Support",cat:"Resources & Support"},
+  {name:"Financial Aid",cat:"Resources & Support"},
+  {name:"Easy Access to Professors",cat:"Resources & Support"},
+  {name:"Mental Health Support",cat:"Resources & Support"},
+  {name:"Strong Alumni Network",cat:"Resources & Support"},
+  {name:"Scholarships & Merit Aid",cat:"Resources & Support"},
+  {name:"On-Campus Health Services",cat:"Resources & Support"},
+  {name:"Athlete Recruitment",cat:"Resources & Support"},
+
+  // CAMPUS CULTURE (26)
+  {name:"Welcoming Student Body",cat:"Campus Culture"},
+  {name:"Party School",cat:"Campus Culture"},
+  {name:"Outdoors Culture",cat:"Campus Culture"},
+  {name:"School Spirit",cat:"Campus Culture"},
+  {name:"Strong Community",cat:"Campus Culture"},
+  {name:"Liberal Campus",cat:"Campus Culture"},
+  {name:"Social Justice Focus",cat:"Campus Culture"},
+  {name:"Friendly Campus",cat:"Campus Culture"},
+  {name:"Work Hard Play Hard",cat:"Campus Culture"},
+  {name:"Politically Aware",cat:"Campus Culture"},
+  {name:"Conservative Campus",cat:"Campus Culture"},
+  {name:"Religious Campus",cat:"Campus Culture"},
+  {name:"Big Fish Small Pond",cat:"Campus Culture"},
+  {name:"LGBTQ+ Friendly",cat:"Campus Culture"},
+  {name:"Green / Eco Campus",cat:"Campus Culture"},
+  {name:"Women Only",cat:"Campus Culture"},
+  {name:"Diverse Campus",cat:"Campus Culture"},
+  {name:"Lots of Free Time",cat:"Campus Culture"},
+  {name:"Creative Culture",cat:"Campus Culture"},
+  {name:"Greek Life",cat:"Campus Culture"},
+  {name:"Good Food / Dining",cat:"Campus Culture"},
+  {name:"National Reputation",cat:"Campus Culture"},
+  {name:"Sense of Belonging",cat:"Campus Culture"},
+  {name:"First-Generation Student Friendly",cat:"Campus Culture"},
+  {name:"Veteran Friendly",cat:"Campus Culture"},
+  {name:"Low Cost of Living Area",cat:"Campus Culture"},
+
+  // LEARNING ENVIRONMENT (26)
+  {name:"Learn by Discussion",cat:"Learning Environment"},
+  {name:"Competitive Environment",cat:"Learning Environment"},
+  {name:"Small Classes",cat:"Learning Environment"},
+  {name:"Large Classes",cat:"Learning Environment"},
+  {name:"Hands-On Learning",cat:"Learning Environment"},
+  {name:"Structured Program",cat:"Learning Environment"},
+  {name:"Thrive Under Pressure",cat:"Learning Environment"},
+  {name:"Design My Own Major",cat:"Learning Environment"},
+  {name:"Hispanic Serving Institution",cat:"Learning Environment"},
+  {name:"Co-Op Programs",cat:"Learning Environment"},
+  {name:"Unstructured Program",cat:"Learning Environment"},
+  {name:"Love of Learning",cat:"Learning Environment"},
+  {name:"Accelerated Programs",cat:"Learning Environment"},
+  {name:"ACT/SAT Optional",cat:"Learning Environment"},
+  {name:"Learn by Listening",cat:"Learning Environment"},
+  {name:"I Want to Be a Top Student",cat:"Learning Environment"},
+  {name:"Learn by Reading",cat:"Learning Environment"},
+  {name:"Apprenticeships, Trades & Certifications",cat:"Learning Environment"},
+  {name:"Gap Year Friendly",cat:"Learning Environment"},
+  {name:"HBCU",cat:"Learning Environment"},
+  {name:"Scholarly Environment",cat:"Learning Environment"},
+  {name:"Collaborative Environment",cat:"Learning Environment"},
+  {name:"Wide Range of Classes & Majors",cat:"Learning Environment"},
+  {name:"Online / Hybrid Options",cat:"Learning Environment"},
+  {name:"Strong Teaching Quality",cat:"Learning Environment"},
+  {name:"Good Graduation Rate",cat:"Learning Environment"},
+];
+
+// ================================================================
+// SCHOOL DATABASE — tags map directly to card names for scoring
+// ================================================================
+const SCHOOLS=[
+  {name:"University of Michigan",location:"Ann Arbor, MI",
+   tags:["Large College","Engineering","Business","Research Opportunities","Strong Alumni Network","Varsity Sports","School Spirit","Diverse Campus","Honors College","National Reputation","Great Lakes (MI, IL, IN, OH, WI)","Work Hard Play Hard","Good Graduation Rate","Internship Programs","Career Services & Job Placement","Snow","College Town","Competitive Environment"]},
+  {name:"UCLA",location:"Los Angeles, CA",
+   tags:["Large College","Film","Computer Science","Psychology","Research Opportunities","Diverse Campus","City Campus","West Coast (AK, CA, HI, NV, OR, WA)","Warm Weather","National Reputation","Strong Alumni Network","Lots of Sunlight","LGBTQ+ Friendly","Varsity Sports","School Spirit","Good Graduation Rate","Internship Programs","Competitive Environment"]},
+  {name:"University of Vermont",location:"Burlington, VT",
+   tags:["Medium College","Environmental Science","Agriculture & Sustainability","Green / Eco Campus","Outdoors Culture","Snow","New England (CT, ME, MA, NH, RI, VT)","Liberal Campus","Friendly Campus","Bike Friendly Campus","Sense of Belonging","Campus Safety","Good Food / Dining","Things to Do on Weekends","Mental Health Support","Small Classes"]},
+  {name:"New York University",location:"New York, NY",
+   tags:["Large College","Film","Business","Communications & Journalism","Drama / Theater","City Campus","Mid-Atlantic (DE, MD, NJ, NY, PA, DC)","Diverse Campus","Study Abroad","Internship Programs","Strong Alumni Network","LGBTQ+ Friendly","National Reputation","Creative Culture","Public Transportation Access","Career Services & Job Placement","Fashion Design","Art","Music / Performing Arts Scene"]},
+  {name:"University of Colorado Boulder",location:"Boulder, CO",
+   tags:["Large College","Environmental Science","Business","Psychology","Outdoors Culture","Rocky Mountains (CO, ID, MT, UT, WY)","Warm Weather","Lots of Sunlight","Bike Friendly Campus","College Town","School Spirit","Party School","Research Opportunities","Varsity Sports","Green / Eco Campus","Things to Do on Weekends","Campus Safety"]},
+  {name:"Howard University",location:"Washington, DC",
+   tags:["Medium College","HBCU","Business","Communications & Journalism","Political Science","Mid-Atlantic (DE, MD, NJ, NY, PA, DC)","City Campus","National Reputation","Strong Community","Diverse Campus","Public Transportation Access","Research Opportunities","Career Services & Job Placement","Internship Programs","Social Justice Focus","Pre-Law"]},
+  {name:"Spelman College",location:"Atlanta, GA",
+   tags:["Small College","HBCU","Women Only","Liberal Arts","Psychology","Public Health","Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)","Strong Community","Sense of Belonging","National Reputation","Diverse Campus","Social Justice Focus","Honors College","Career Services & Job Placement","First-Generation Student Friendly","Small Classes"]},
+  {name:"University of Texas at Austin",location:"Austin, TX",
+   tags:["Large College","Business","Engineering","Computer Science","Communications & Journalism","Southwest (AZ, NM, OK, TX)","College Town","Warm Weather","Varsity Sports","School Spirit","National Reputation","Research Opportunities","Internship Programs","Diverse Campus","Things to Do on Weekends","Career Services & Job Placement","Music / Performing Arts Scene","Pre-Law"]},
+  {name:"Middlebury College",location:"Middlebury, VT",
+   tags:["Small College","Foreign Language & Linguistics","Environmental Science","Liberal Arts","New England (CT, ME, MA, NH, RI, VT)","Rural Setting","Snow","Outdoors Culture","Small Classes","Learn by Discussion","Scholarly Environment","Easy Access to Professors","Study Abroad","Sense of Belonging","Good Graduation Rate","Collaborative Environment"]},
+  {name:"Northeastern University",location:"Boston, MA",
+   tags:["Large College","Computer Science","Business","Engineering","Co-Op Programs","New England (CT, ME, MA, NH, RI, VT)","City Campus","Internship Programs","Career Services & Job Placement","Strong Alumni Network","Diverse Campus","Research Opportunities","National Reputation","Good Graduation Rate","Public Transportation Access","Hands-On Learning"]},
+  {name:"Arizona State University",location:"Tempe, AZ",
+   tags:["Large College","Business","Engineering","Computer Science","Nursing","Southwest (AZ, NM, OK, TX)","Suburban Setting","Warm Weather","Lots of Sunlight","Online / Hybrid Options","ACT/SAT Optional","Research Opportunities","Diverse Campus","Internship Programs","Financial Aid","Scholarships & Merit Aid","First-Generation Student Friendly","Wide Range of Classes & Majors"]},
+  {name:"Tulane University",location:"New Orleans, LA",
+   tags:["Medium College","Public Health","Business","Architecture","Liberal Arts","Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)","City Campus","Warm Weather","Party School","Strong Community","Study Abroad","Community Service","School Spirit","Good Food / Dining","Music / Performing Arts Scene","Things to Do on Weekends","Pre-Med / Health Sciences"]},
+  {name:"Georgetown University",location:"Washington, DC",
+   tags:["Medium College","Pre-Law","International Relations","Political Science","Business","Mid-Atlantic (DE, MD, NJ, NY, PA, DC)","City Campus","National Reputation","Scholarly Environment","Research Opportunities","Study Abroad","Diverse Campus","Strong Alumni Network","Career Services & Job Placement","Public Transportation Access","Good Graduation Rate","Competitive Environment","Religious Campus"]},
+  {name:"Davidson College",location:"Davidson, NC",
+   tags:["Small College","Liberal Arts","Political Science","Economics","Biology","Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)","College Town","Small Classes","Learn by Discussion","Scholarly Environment","Honors College","Easy Access to Professors","Strong Community","Good Graduation Rate","Sense of Belonging","Collaborative Environment","Campus Safety"]},
+  {name:"Colorado State University",location:"Fort Collins, CO",
+   tags:["Large College","Agriculture & Sustainability","Environmental Science","Biology","Business","Rocky Mountains (CO, ID, MT, UT, WY)","College Town","Outdoors Culture","Warm Weather","Lots of Sunlight","Green / Eco Campus","Research Opportunities","Varsity Sports","School Spirit","Friendly Campus","Campus Safety","Good Graduation Rate","Scholarships & Merit Aid"]},
+  {name:"Texas A&M University",location:"College Station, TX",
+   tags:["Large College","Engineering","Agriculture & Sustainability","Business","Southwest (AZ, NM, OK, TX)","College Town","Warm Weather","ROTC","School Spirit","Conservative Campus","Varsity Sports","Greek Life","Strong Community","Research Opportunities","National Reputation","Career Services & Job Placement","Good Graduation Rate","Veteran Friendly"]},
+  {name:"Savannah College of Art and Design",location:"Savannah, GA",
+   tags:["Medium College","Art","Graphic Design / UX Design","Fashion Design","Film","Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)","City Campus","Creative Culture","Warm Weather","Internship Programs","Career Services & Job Placement","Strong Alumni Network","Scenic / Beautiful Campus","Things to Do on Weekends","Good Food / Dining","Architecture"]},
+  {name:"University of Wisconsin-Madison",location:"Madison, WI",
+   tags:["Large College","Business","Engineering","Biology","Psychology","Great Lakes (MI, IL, IN, OH, WI)","College Town","Research Opportunities","Varsity Sports","School Spirit","Party School","Snow","Bike Friendly Campus","Strong Alumni Network","National Reputation","Good Graduation Rate","Internship Programs","Pre-Med / Health Sciences"]},
+  {name:"Brigham Young University",location:"Provo, UT",
+   tags:["Large College","Business","Engineering","Education / Teaching","Computer Science","Rocky Mountains (CO, ID, MT, UT, WY)","College Town","Religious Campus","Conservative Campus","Lots of Sunlight","Strong Community","School Spirit","Scholarships & Merit Aid","Good Graduation Rate","Low Cost of Living Area","Varsity Sports","Sense of Belonging"]},
+  {name:"Reed College",location:"Portland, OR",
+   tags:["Small College","Liberal Arts","Philosophy","English","Chemistry","West Coast (AK, CA, HI, NV, OR, WA)","City Campus","Scholarly Environment","Learn by Discussion","Unstructured Program","Design My Own Major","Creative Culture","LGBTQ+ Friendly","Green / Eco Campus","Small Classes","Love of Learning","Collaborative Environment"]},
+  {name:"University of Montana",location:"Missoula, MT",
+   tags:["Medium College","Environmental Science","Communications & Journalism","Psychology","Law","Rocky Mountains (CO, ID, MT, UT, WY)","College Town","Outdoors Culture","Rural Setting","Snow","Lots of Sunlight","Friendly Campus","Small Classes","Easy Access to Professors","Scholarships & Merit Aid","Low Cost of Living Area","Sense of Belonging","Campus Safety"]},
+  {name:"Morehouse College",location:"Atlanta, GA",
+   tags:["Small College","HBCU","Business","Political Science","Liberal Arts","Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)","Strong Community","National Reputation","Diverse Campus","Social Justice Focus","Easy Access to Professors","Sense of Belonging","Career Services & Job Placement","Scholarly Environment","Pre-Law"]},
+  {name:"Purdue University",location:"West Lafayette, IN",
+   tags:["Large College","Engineering","Computer Science","Agriculture & Sustainability","Great Lakes (MI, IL, IN, OH, WI)","College Town","Research Opportunities","Co-Op Programs","Career Services & Job Placement","Strong Alumni Network","Internship Programs","Snow","Varsity Sports","School Spirit","Good Graduation Rate","National Reputation","Competitive Environment"]},
+  {name:"Belmont University",location:"Nashville, TN",
+   tags:["Medium College","Music","Business","Nursing","Communications & Journalism","Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)","City Campus","Warm Weather","Religious Campus","Strong Community","Music / Performing Arts Scene","Things to Do on Weekends","Career Services & Job Placement","Good Food / Dining","Scenic / Beautiful Campus","Sense of Belonging"]},
+  {name:"University of Oregon",location:"Eugene, OR",
+   tags:["Large College","Environmental Science","Communications & Journalism","Architecture","Psychology","West Coast (AK, CA, HI, NV, OR, WA)","College Town","Outdoors Culture","Green / Eco Campus","Bike Friendly Campus","Varsity Sports","School Spirit","Liberal Campus","Things to Do on Weekends","Internship Programs","Study Abroad","Scenic / Beautiful Campus"]},
+  {name:"University of Alabama",location:"Tuscaloosa, AL",
+   tags:["Large College","Business","Nursing","Engineering","Communications & Journalism","Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)","College Town","Warm Weather","Greek Life","School Spirit","Varsity Sports","Party School","Scholarships & Merit Aid","Financial Aid","Things to Do on Weekends","Low Cost of Living Area"]},
+  {name:"Fordham University",location:"New York, NY",
+   tags:["Medium College","Pre-Law","Business","Communications & Journalism","Psychology","Mid-Atlantic (DE, MD, NJ, NY, PA, DC)","City Campus","Religious Campus","Diverse Campus","Strong Community","Internship Programs","Career Services & Job Placement","Study Abroad","Public Transportation Access","Strong Alumni Network","Good Graduation Rate"]},
+  {name:"University of New Mexico",location:"Albuquerque, NM",
+   tags:["Large College","Pre-Law","Pre-Med / Health Sciences","Psychology","Nursing","Southwest (AZ, NM, OK, TX)","City Campus","Warm Weather","Diverse Campus","Hispanic Serving Institution","Financial Aid","Scholarships & Merit Aid","Research Opportunities","First-Generation Student Friendly","Low Cost of Living Area","ACT/SAT Optional"]},
+  {name:"Embry-Riddle Aeronautical University",location:"Daytona Beach, FL",
+   tags:["Medium College","Engineering","Military Studies","ROTC","Computer Science","Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)","Suburban Setting","Warm Weather","Lots of Sunlight","Hands-On Learning","Co-Op Programs","Career Services & Job Placement","Internship Programs","Competitive Environment","Strong Teaching Quality","Veteran Friendly"]},
+  {name:"University of Miami",location:"Coral Gables, FL",
+   tags:["Medium College","Business","Music","Communications & Journalism","Pre-Med / Health Sciences","Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)","Suburban Setting","Warm Weather","Lots of Sunlight","Diverse Campus","Internship Programs","Study Abroad","Party School","Things to Do on Weekends","Scenic / Beautiful Campus","Research Opportunities","Strong Alumni Network"]},
+];
+
+// ================================================================
+// STATE & ENGINE
+// ================================================================
+let cards=[],idx=0,placements={},counts={1:0,2:0,3:0,4:0,5:0};
+
+function init(){
+  cards=[...ALL_CARDS].sort(()=>Math.random()-.5);
+  document.getElementById('totalCount').textContent=`${cards.length} cards across 7 categories`;
+}
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function startSorting(){showScreen('sorting');renderCard();}
+function renderCard(){
+  if(idx>=cards.length){finishSorting();return;}
+  const card=cards[idx];
+  const el=document.getElementById('mainCard');
+  document.getElementById('cardName').textContent=card.name;
+  document.getElementById('cardTag').textContent=card.cat;
+  el.classList.remove('flying');
+  el.classList.add('entering');
+  setTimeout(()=>el.classList.remove('entering'),350);
+  const pct=Math.round((idx/cards.length)*100);
+  document.getElementById('pFill').style.width=pct+'%';
+  document.getElementById('pLabel').textContent=`${idx} / ${cards.length}`;
+  for(let i=1;i<=5;i++){const c=counts[i];document.getElementById('cnt'+i).textContent=c+(c===1?' card':' cards');}
+}
+function placeCard(cat){
+  placements[idx]=cat;counts[cat]++;
+  const el=document.getElementById('mainCard');
+  el.classList.add('flying');
+  const zone=document.querySelector(`.zone[data-cat="${cat}"]`);
+  zone.classList.add('placed');
+  setTimeout(()=>zone.classList.remove('placed'),300);
+  idx++;
+  setTimeout(()=>renderCard(),260);
+}
+
+// Desktop drag
+const mc=document.getElementById('mainCard');
+mc.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';setTimeout(()=>mc.style.opacity='.4',0);});
+mc.addEventListener('dragend',()=>{mc.style.opacity='1';document.querySelectorAll('.zone').forEach(z=>z.classList.remove('dragover'));});
+document.querySelectorAll('.zone').forEach(z=>{
+  z.addEventListener('dragover',e=>{e.preventDefault();document.querySelectorAll('.zone').forEach(x=>x.classList.remove('dragover'));z.classList.add('dragover');});
+  z.addEventListener('dragleave',()=>z.classList.remove('dragover'));
+  z.addEventListener('drop',e=>{e.preventDefault();z.classList.remove('dragover');mc.style.opacity='1';placeCard(parseInt(z.dataset.cat));});
+});
+
+// Touch drag
+let tClone=null;
+mc.addEventListener('touchstart',e=>{
+  const t=e.touches[0],r=mc.getBoundingClientRect();
+  tClone=mc.cloneNode(true);
+  tClone.style.cssText=`position:fixed;width:${r.width}px;height:${r.height}px;pointer-events:none;z-index:9999;opacity:.92;left:${t.clientX-r.width/2}px;top:${t.clientY-r.height/2}px;transform:rotate(3deg) scale(1.05);box-shadow:0 20px 60px rgba(0,0,0,.25);border-radius:16px;background:#fff;`;
+  document.body.appendChild(tClone);mc.style.opacity='.3';
+},{passive:true});
+mc.addEventListener('touchmove',e=>{
+  if(!tClone)return;const t=e.touches[0];
+  tClone.style.left=(t.clientX-tClone.offsetWidth/2)+'px';
+  tClone.style.top=(t.clientY-tClone.offsetHeight/2)+'px';
+  document.querySelectorAll('.zone').forEach(z=>{const r=z.getBoundingClientRect();
+    if(t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom)z.classList.add('dragover');else z.classList.remove('dragover');});
+},{passive:true});
+mc.addEventListener('touchend',e=>{
+  if(!tClone)return;const t=e.changedTouches[0];
+  document.querySelectorAll('.zone').forEach(z=>z.classList.remove('dragover'));
+  let placed=false;
+  document.querySelectorAll('.zone').forEach(z=>{const r=z.getBoundingClientRect();
+    if(t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom){placed=true;tClone.remove();tClone=null;mc.style.opacity='1';placeCard(parseInt(z.dataset.cat));}});
+  if(!placed){tClone.remove();tClone=null;mc.style.opacity='1';}
+},{passive:true});
+
+// Keyboard
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('sorting').classList.contains('active'))return;
+  if(['1','2','3','4','5'].includes(e.key))placeCard(parseInt(e.key));
+});
+
+// Scoring
+function scoreSchools(){
+  const W={5:10,4:5,3:0,2:-3,1:-10};
+  const cardMap={};
+  cards.forEach((c,i)=>{cardMap[c.name]=placements[i]||3;});
+  return SCHOOLS.map(school=>{
+    let score=0,maxP=0,dealBroken=false;
+    school.tags.forEach(tag=>{
+      const r=cardMap[tag];if(r===undefined)return;
+      if(r===1)dealBroken=true;
+      score+=W[r];maxP+=W[5];
+    });
+    if(dealBroken)score=Math.min(score,-50);
+    const fitPercent=dealBroken?Math.floor(Math.random()*15+5)
+      :Math.min(99,Math.max(10,Math.round(50+(score/(maxP||1))*49)));
+    const matchedTags=school.tags.filter(t=>cardMap[t]>=4).slice(0,5);
+    return{...school,fitPercent,matchedTags,dealBroken};
+  }).sort((a,b)=>b.fitPercent-a.fitPercent).slice(0,8);
+}
+
+function finishSorting(){
+  showScreen('loading');
+  ['ls1','ls2','ls3','ls4'].forEach((id,i)=>setTimeout(()=>document.getElementById(id).classList.add('done'),i*700+300));
+  setTimeout(()=>{
+    const results=scoreSchools();
+    const must=[],like=[];
+    cards.forEach((c,i)=>{if(placements[i]===5)must.push(c.name);else if(placements[i]===4)like.push(c.name);});
+    showResults(results,must,like);
+  },3200);
+}
+
+function showResults(schools,must,like){
+  showScreen('results');
+  const colors=['#2a9d5c','#2d5be3','#9a9590','#e07b2a','#c8453a'];
+  const labels=['Must Have','Would Like','Neutral','Prefer Not',"Don't Like"];
+  document.getElementById('sumStrip').innerHTML=[5,4,3,2,1].map((cat,i)=>`
+    <div class="sum-item"><div class="sum-num" style="color:${colors[i]}">${counts[cat]}</div><div class="sum-lbl">${labels[i]}</div></div>`).join('');
+  document.getElementById('pills').innerHTML=[
+    ...must.slice(0,10).map(p=>`<div class="pill pill-must">★ ${p}</div>`),
+    ...like.slice(0,8).map(p=>`<div class="pill pill-like">↑ ${p}</div>`)
+  ].join('');
+  const fitColor=pct=>pct>=80?'#2a9d5c':pct>=65?'#2d5be3':pct>=50?'#e07b2a':'#c8453a';
+  document.getElementById('schoolsList').innerHTML=schools.map((s,i)=>{
+    const tags=s.matchedTags.length?s.matchedTags:s.tags.slice(0,4);
+    const why=s.dealBroken
+      ?`This school has traits you listed as deal-breakers and may not be a strong fit.`
+      :`Matches ${s.matchedTags.length} of your top priorities${s.matchedTags.length?', including '+s.matchedTags.slice(0,2).join(' and '):''}.`;
+    return`<div class="s-card">
+      <div class="s-bar-wrap"><div class="s-bar" style="width:0%;background:${fitColor(s.fitPercent)}" data-pct="${s.fitPercent}"></div></div>
+      <div class="s-inner">
+        <div class="s-rank">${String(i+1).padStart(2,'0')}</div>
+        <div class="s-info">
+          <div class="s-name">${s.name}</div>
+          <div class="s-loc">📍 ${s.location}</div>
+          <div class="s-tags">${tags.map(t=>`<span class="s-tag">${t}</span>`).join('')}</div>
+        </div>
+        <div class="s-pct"><div class="s-pct-num" style="color:${fitColor(s.fitPercent)}">${s.fitPercent}%</div><div class="s-pct-lbl">FIT SCORE</div></div>
+      </div>
+      <div class="s-why">${why}</div>
+    </div>`;
+  }).join('');
+  requestAnimationFrame(()=>setTimeout(()=>document.querySelectorAll('.s-bar').forEach(b=>b.style.width=b.dataset.pct+'%'),120));
+}
+
+function resetApp(){
+  counts={1:0,2:0,3:0,4:0,5:0};placements={};idx=0;
+  cards=[...ALL_CARDS].sort(()=>Math.random()-.5);
+  showScreen('splash');
+}
+
+init();
+</script>
+</body>
+</html>
