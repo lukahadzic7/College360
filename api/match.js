@@ -9,16 +9,33 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { mustHave, wouldLike, dontCare, preferNot, dontLike } = req.body;
+    const { mustHave, wouldLike, dontCare, preferNot, dontLike, studentProfile } = req.body;
+
+    // Build student profile context from intake form answers
+    const profile = studentProfile || {};
+    const profileContext = `
+STUDENT BACKGROUND:
+- Current location: ${profile.location || 'Not specified'}
+- Current school: ${profile.school || 'Not specified'}
+- GPA range: ${profile.gpa || 'Not specified'}
+- School type preference: ${profile.schoolType || 'Not specified'}`;
 
     const prompt = `You are an expert college counselor with encyclopedic, fact-based knowledge of US colleges and universities. A student has completed the College 360 preference card sort. Your job is to recommend their top 8 best-fit colleges with extreme precision and accuracy.
 
-STUDENT PREFERENCES:
+${profileContext}
+
+STUDENT CARD SORT PREFERENCES:
 MUST HAVE (deal-maker — school must satisfy these or it cannot be recommended): ${mustHave.join(', ') || 'none'}
-WOULD LIKE (high priority — strongly weight these in scoring): ${wouldLike.join(', ') || 'none'}
-NEUTRAL (no weight): ${dontCare.join(', ') || 'none'}
-WOULD PREFER NOT (negative weight — penalize schools with these traits): ${preferNot.join(', ') || 'none'}
-DON'T LIKE AT ALL (deal-breaker — automatically disqualify any school strongly associated with these): ${dontLike.join(', ') || 'none'}
+WOULD LIKE THIS (high priority — strongly weight these in scoring): ${wouldLike.join(', ') || 'none'}
+DOESN'T MATTER (neutral): ${dontCare.join(', ') || 'none'}
+WOULD RATHER NOT (negative weight — penalize schools with these traits): ${preferNot.join(', ') || 'none'}
+NOT FOR ME (deal-breaker — automatically disqualify any school strongly associated with these): ${dontLike.join(', ') || 'none'}
+
+STUDENT PROFILE RULES:
+- Use the student's current GPA to calibrate reach vs. match vs. safety schools. A 3.5+ GPA student should have at least 2 selective schools. A 2.5-3.0 GPA student should have mostly accessible schools.
+- Use the student's current state to understand proximity preferences if location cards were sorted.
+- If student selected Community College or Trade/Certification, prioritize those school types. Do not recommend large research universities to a student who said Community College.
+- If student selected 4-Year University, do not recommend community colleges.
 
 ACCURACY RULES — follow all of these strictly:
 
@@ -31,48 +48,47 @@ LOCATION: Only recommend schools physically located in the student's preferred r
 - Great Lakes = MI, IL, IN, OH, WI
 - Plains = IA, KS, MN, MO, NE, ND, SD
 - Southwest = AZ, NM, OK, TX
-If the student marked a region as Don't Like, never recommend a school from that region.
+If the student marked a region as Not For Me, never recommend a school from that region.
 
 SIZE: Match accurately based on undergraduate enrollment.
 - Small College = under 3,000 undergrads
-- Medium College = 3,000 to 15,000 undergrads
+- Medium Sized College = 3,000 to 15,000 undergrads
 - Large College = over 15,000 undergrads
 
-ACADEMICS: Only recommend a school for a specific major if that school is genuinely well-known for that program. Never suggest a school for Engineering if it has no engineering program. Never suggest a school for Nursing if it has no nursing program.
+ACADEMICS: Only recommend a school for a specific major if that school is genuinely well-known for that program.
 
 CULTURE & IDENTITY:
-- HBCU: only recommend schools officially designated as Historically Black Colleges and Universities by the federal government
+- HBCU: only recommend schools officially designated as Historically Black Colleges and Universities
 - Hispanic Serving Institution: only recommend schools with official HSI federal designation
 - Women Only: only recommend actual women's colleges
 - Religious Campus: only recommend schools with a genuine active religious identity
-- LGBTQ+ Friendly: only recommend schools with documented inclusive policies and active LGBTQ+ communities
+- LGBTQ+ Friendly: only recommend schools with documented inclusive policies
 - Conservative Campus: only recommend schools widely known for conservative student culture
 - Party School: only recommend schools with a documented, well-known party culture
-- Greek Life: only recommend schools with active, prominent Greek life
 
-WEATHER: If student marked Snow as Don't Like, never recommend schools in MN, WI, VT, ME, NH, ND, SD, MI, upstate NY, or any other high-snowfall region. If Warm Weather is Must Have, only recommend schools in FL, TX, AZ, CA, HI, or other warm-climate states.
+WEATHER: If student marked Snow as Not For Me, never recommend schools in MN, WI, VT, ME, NH, ND, SD, MI, upstate NY. If Warm Weather is Must Have, only recommend schools in FL, TX, AZ, CA, HI, or other warm-climate states.
 
-FIT SCORING: Be honest and precise. Do not inflate scores.
-- 90-97%: school matches nearly all must-haves and most would-likes with no deal-breakers
-- 75-89%: school matches most must-haves with minor gaps
-- 60-74%: school matches some preferences but has notable mismatches
-- 52-59%: included for diversity of options but has meaningful gaps
-Never give a school above 80% unless it genuinely matches the majority of the student's top priorities.
+FIT SCORING — be honest and precise:
+- 90-97%: matches nearly all must-haves, no deal-breakers
+- 75-89%: matches most must-haves with minor gaps
+- 60-74%: matches some preferences but notable mismatches
+- 52-59%: included for diversity but has meaningful gaps
+Never give above 80% unless the school genuinely matches the majority of top priorities.
 
-EXPLANATION QUALITY: The "why" field must cite specific, verifiable facts directly tied to the student's stated preferences. Never use generic phrases like "great academics," "vibrant campus life," or "strong community." Be specific: cite enrollment size, known programs, location type, culture, athletics, cost profile, or other concrete attributes.
+EXPLANATION: The "why" field must cite specific, verifiable facts directly tied to the student's stated preferences. Never use generic phrases like "great academics" or "vibrant campus life." Be specific: cite enrollment size, known programs, location type, culture, athletics, or cost profile.
 
 SCHOOL DIVERSITY: Include a mix of:
 - At least 2 nationally recognized universities
 - At least 2 strong regional schools the student may not have considered
 - At least 1 smaller or lesser-known school that is a genuine hidden gem fit
-- Schools across different price points if cost-related cards were sorted
+- Schools across different price points
 
 Return ONLY valid JSON — no markdown, no explanation, no backticks, no preamble of any kind.
 Return a JSON array of exactly 8 school objects. Each object must have:
-- "name": full official school name (e.g. "University of Michigan" not "U of M")
+- "name": full official school name
 - "location": city, state (e.g. "Ann Arbor, MI")
 - "fitPercent": honest integer between 52 and 97
-- "tags": array of exactly 4 short factual strings explaining the match (e.g. "45,000 undergrads", "Top-10 Engineering", "Big Ten athletics", "Midwest college town")
+- "tags": array of exactly 4 short factual strings explaining the match
 - "why": exactly 2 sentences. Sentence 1: cite 2-3 specific verifiable facts connecting this school to the student's preferences. Sentence 2: one honest caveat or important thing to know about this school.
 
 Order by fitPercent descending. Be rigorous, accurate, and specific.`;
