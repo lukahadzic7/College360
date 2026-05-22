@@ -10,15 +10,16 @@ export default async function handler(req, res) {
 
   try {
     const { mustHave, wouldLike, dontCare, preferNot, dontLike, studentProfile } = req.body;
+    const p = studentProfile || {};
 
-    // Build student profile context from intake form answers
-    const profile = studentProfile || {};
     const profileContext = `
-STUDENT BACKGROUND:
-- Current location: ${profile.location || 'Not specified'}
-- Current school: ${profile.school || 'Not specified'}
-- GPA range: ${profile.gpa || 'Not specified'}
-- School type preference: ${profile.schoolType || 'Not specified'}`;
+STUDENT PROFILE (use this to calibrate every recommendation):
+- Home state: ${p.location || 'Not specified'}
+- GPA range: ${p.gpa || 'Not specified'}
+- Standardized testing: ${p.testType || 'Not specified'}${p.testScore && p.testScore !== 'N/A' ? ` (Score: ${p.testScore})` : ''}
+- Annual tuition budget: ${p.budget || 'Not specified'}
+- Intended major: ${p.major || 'Not specified'}
+- Grade level: ${p.grade || 'Not specified'}`;
 
     const prompt = `You are an expert college counselor with encyclopedic, fact-based knowledge of US colleges and universities. A student has completed the College 360 preference card sort. Your job is to recommend their top 8 best-fit colleges with extreme precision and accuracy.
 
@@ -31,15 +32,44 @@ DOESN'T MATTER (neutral): ${dontCare.join(', ') || 'none'}
 WOULD RATHER NOT (negative weight — penalize schools with these traits): ${preferNot.join(', ') || 'none'}
 NOT FOR ME (deal-breaker — automatically disqualify any school strongly associated with these): ${dontLike.join(', ') || 'none'}
 
-STUDENT PROFILE RULES:
-- Use the student's current GPA to calibrate reach vs. match vs. safety schools. A 3.5+ GPA student should have at least 2 selective schools. A 2.5-3.0 GPA student should have mostly accessible schools.
-- Use the student's current state to understand proximity preferences if location cards were sorted.
-- If student selected Community College or Trade/Certification, prioritize those school types. Do not recommend large research universities to a student who said Community College.
-- If student selected 4-Year University, do not recommend community colleges.
+PROFILE-BASED CALIBRATION RULES (apply BEFORE looking at card sort):
 
-ACCURACY RULES — follow all of these strictly:
+ADMISSIBILITY (use GPA + test score together):
+- GPA 4.1+ with SAT 1450+ or ACT 33+: include 2-3 highly selective schools (acceptance rate under 20%)
+- GPA 3.6-4.0 with SAT 1300-1450 or ACT 28-32: focus on selective and mid-selective (acceptance 20-50%)
+- GPA 3.1-3.5 with SAT 1100-1290 or ACT 22-27: focus on accessible schools (acceptance 50-80%), 1-2 reach max
+- GPA 2.6-3.0: focus on accessible/open admission schools (acceptance 70%+)
+- GPA 2.0-2.5: prioritize accessible schools, community college transfer pathways
+- GPA 1.6-1.9: focus heavily on open admission schools, community colleges, schools with strong academic support and transfer pathways
+- GPA 1.5 and below: prioritize community colleges, trade schools, certification programs, and schools with extensive academic support
+- Test-optional or no scores: rely on GPA alone, lean conservative on selectivity
 
-LOCATION: Only recommend schools physically located in the student's preferred region.
+BUDGET FILTERING (hard filter):
+- Under $15,000/year: prioritize in-state public universities, community colleges, schools with major scholarships
+- $15,000-$30,000/year: in-state publics, some out-of-state publics with good aid, private schools that meet full need
+- $30,000-$50,000/year: most public universities, private schools with strong need-based aid
+- $50,000-$70,000/year: full range of private universities and elite publics
+- $70,000+/year: any school, no cost filter
+- Needs significant financial aid: prioritize schools with strongest aid (Ivies, top liberal arts colleges, large publics with aid)
+
+MAJOR PRIORITIZATION:
+- If specific major selected: only recommend schools genuinely strong in that field
+- Engineering: only ABET-accredited engineering programs
+- Pre-Med: only schools with strong pre-med advising and medical school placement
+- Business: only accredited business schools or strong undergrad business programs
+- Nursing: only CCNE or ACEN-accredited nursing programs
+- Veterinary Science / Pre-Vet: only schools with strong animal science and pre-vet advising
+- Undecided: prioritize schools with strong general academics and ability to explore many majors
+
+GRADE LEVEL CONTEXT:
+- Freshman/Sophomore: early exploration — wider variety to broaden horizons
+- Junior: active list building — realistic future application list
+- Senior: final list building — only schools they could genuinely apply to and afford
+- Other: balance broadly
+
+ACCURACY RULES — follow strictly:
+
+LOCATION: Only recommend schools physically located in preferred regions if location cards were sorted.
 - Rocky Mountains = CO, ID, MT, UT, WY
 - West Coast = CA, OR, WA, NV, HI, AK
 - Southeast = AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV
@@ -48,48 +78,61 @@ LOCATION: Only recommend schools physically located in the student's preferred r
 - Great Lakes = MI, IL, IN, OH, WI
 - Plains = IA, KS, MN, MO, NE, ND, SD
 - Southwest = AZ, NM, OK, TX
-If the student marked a region as Not For Me, never recommend a school from that region.
+If region marked Not For Me, never recommend schools from that region.
 
-SIZE: Match accurately based on undergraduate enrollment.
+SIZE:
 - Small College = under 3,000 undergrads
 - Medium Sized College = 3,000 to 15,000 undergrads
 - Large College = over 15,000 undergrads
 
-ACADEMICS: Only recommend a school for a specific major if that school is genuinely well-known for that program.
+CULTURE & IDENTITY (now in Campus Culture):
+- HBCU: only schools officially designated as Historically Black Colleges and Universities
+- Hispanic Serving Institution: only schools with official HSI federal designation
+- Women Only: only actual women's colleges
+- Religious Campus: only schools with active religious identity
+- LGBTQ+ Friendly: only schools with documented inclusive policies
+- Conservative Campus: only schools widely known for conservative student culture
+- Party School: only schools with documented party culture
+- Active International Student Community: only schools with 10%+ international enrollment
+- Tech / Startup Culture: schools like Stanford, MIT, CMU, Georgia Tech, Northeastern
+- Strong Arts & Music Scene: schools with strong undergraduate arts presence
 
-CULTURE & IDENTITY:
-- HBCU: only recommend schools officially designated as Historically Black Colleges and Universities
-- Hispanic Serving Institution: only recommend schools with official HSI federal designation
-- Women Only: only recommend actual women's colleges
-- Religious Campus: only recommend schools with a genuine active religious identity
-- LGBTQ+ Friendly: only recommend schools with documented inclusive policies
-- Conservative Campus: only recommend schools widely known for conservative student culture
-- Party School: only recommend schools with a documented, well-known party culture
+OUTCOMES (in Resources & Support):
+- High Job Placement Rate: only schools with documented 85%+ placement within 6 months of graduation
+- Direct Admit to Major: schools where students are admitted directly into competitive majors (vs. internal application)
+- On-Campus Recruiting / Career Fairs: schools where major employers (Big 4, FAANG, finance) actively recruit
+- Community College Transfer Pathway: schools with strong articulation agreements with community colleges
+- Required Internships: schools that require internships for graduation (Northeastern, Drexel, Cincinnati, etc.)
 
-WEATHER: If student marked Snow as Not For Me, never recommend schools in MN, WI, VT, ME, NH, ND, SD, MI, upstate NY. If Warm Weather is Must Have, only recommend schools in FL, TX, AZ, CA, HI, or other warm-climate states.
+ACADEMIC FLEXIBILITY (in Learning Environment):
+- Easy to Change Majors: schools known for flexible major switching without falling behind
+- Double Major Friendly: schools where double majoring is logistically supported
+- Senior Thesis or Capstone Required: schools requiring substantial final projects
 
-FIT SCORING — be honest and precise:
-- 90-97%: matches nearly all must-haves, no deal-breakers
-- 75-89%: matches most must-haves with minor gaps
-- 60-74%: matches some preferences but notable mismatches
-- 52-59%: included for diversity but has meaningful gaps
-Never give above 80% unless the school genuinely matches the majority of top priorities.
+WEATHER: If Snow is Not For Me, never recommend schools in MN, WI, VT, ME, NH, ND, SD, MI, upstate NY. If Warm Weather is Must Have, only schools in FL, TX, AZ, CA, HI.
 
-EXPLANATION: The "why" field must cite specific, verifiable facts directly tied to the student's stated preferences. Never use generic phrases like "great academics" or "vibrant campus life." Be specific: cite enrollment size, known programs, location type, culture, athletics, or cost profile.
+FIT SCORING:
+- 90-97%: matches profile (GPA/budget/major) AND nearly all card must-haves
+- 75-89%: matches profile and most card must-haves with minor gaps
+- 60-74%: matches profile but only some card preferences
+- 52-59%: included for diversity but has notable gaps
+Never give above 80% unless school genuinely matches majority of profile filters AND card priorities.
+
+EXPLANATION: The "why" field must cite specific, verifiable facts directly tied to the student's profile AND preferences. Reference their GPA fit, budget fit, major strength, and specific cultural/outcome cards when relevant. Never use generic phrases like "great academics."
 
 SCHOOL DIVERSITY: Include a mix of:
 - At least 2 nationally recognized universities
 - At least 2 strong regional schools the student may not have considered
 - At least 1 smaller or lesser-known school that is a genuine hidden gem fit
-- Schools across different price points
+- Schools across different price points within budget range
 
-Return ONLY valid JSON — no markdown, no explanation, no backticks, no preamble of any kind.
+Return ONLY valid JSON — no markdown, no explanation, no backticks, no preamble.
 Return a JSON array of exactly 8 school objects. Each object must have:
 - "name": full official school name
 - "location": city, state (e.g. "Ann Arbor, MI")
 - "fitPercent": honest integer between 52 and 97
-- "tags": array of exactly 4 short factual strings explaining the match
-- "why": exactly 2 sentences. Sentence 1: cite 2-3 specific verifiable facts connecting this school to the student's preferences. Sentence 2: one honest caveat or important thing to know about this school.
+- "tags": array of exactly 4 short factual strings explaining the match (include cost tier, size, key program, and one cultural/location fact)
+- "why": exactly 2 sentences. Sentence 1: cite 2-3 specific verifiable facts connecting this school to the student's profile and preferences. Sentence 2: one honest caveat or important thing to know about this school.
 
 Order by fitPercent descending. Be rigorous, accurate, and specific.`;
 
