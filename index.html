@@ -1,169 +1,967 @@
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>College 360</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f2eb;--surface:#fff;--ink:#1a1814;--muted:#8a8680;--rule:#ddd9d0;
+  --c1:#c8453a;--c2:#e07b2a;--c3:#9a9590;--c4:#2d5be3;--c5:#2a9d5c;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden}
+.screen{display:none;min-height:100vh}
+.screen.active{display:flex;flex-direction:column}
+
+/* ── SPLASH ── */
+#splash{align-items:center;justify-content:center;background:#1a1814;position:relative;overflow:hidden}
+#splash::before{content:'';position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(200,69,58,.25) 0%,transparent 70%);top:-200px;right:-200px}
+#splash::after{content:'';position:absolute;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(45,91,227,.18) 0%,transparent 70%);bottom:-100px;left:-100px}
+.splash-inner{text-align:center;z-index:1;padding:40px;max-width:560px}
+.splash-logo{font-family:'Bebas Neue',sans-serif;font-size:clamp(64px,12vw,120px);color:#fff;line-height:.9;letter-spacing:2px}
+.splash-logo span{color:var(--c1)}
+.splash-tagline{font-family:'Bebas Neue',sans-serif;font-size:clamp(20px,4vw,32px);color:#fff;margin-top:16px;line-height:1.1;letter-spacing:.5px}
+.splash-sub2{font-size:15px;color:rgba(255,255,255,.5);margin-top:8px;font-style:italic}
+.splash-desc{color:rgba(255,255,255,.6);max-width:400px;margin:28px auto 44px;line-height:1.7;font-size:15px}
+.btn-primary{background:var(--c1);color:#fff;border:none;padding:18px 52px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;border-radius:4px;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 24px rgba(200,69,58,.4)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(200,69,58,.55)}
+.splash-count{color:rgba(255,255,255,.25);font-size:13px;margin-top:20px;font-family:'DM Mono',monospace}
+
+/* ── INTAKE FORM ── */
+#intake{background:#1a1814;align-items:center;justify-content:center;padding:0 24px}
+.intake-inner{width:100%;max-width:520px;z-index:1;padding:40px 0}
+.intake-logo{font-family:'Bebas Neue',sans-serif;font-size:26px;color:#fff;letter-spacing:1px;margin-bottom:32px}
+.intake-logo span{color:var(--c1)}
+.intake-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,6vw,52px);color:#fff;line-height:1;margin-bottom:8px}
+.intake-sub{color:rgba(255,255,255,.45);font-size:14px;margin-bottom:36px;line-height:1.6}
+.intake-form{display:flex;flex-direction:column;gap:20px}
+.intake-q{display:flex;flex-direction:column;gap:8px}
+.intake-label{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.5);font-family:'DM Mono',monospace}
+.intake-input{background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);border-radius:8px;padding:14px 16px;font-size:15px;color:#fff;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .2s;-webkit-appearance:none}
+.intake-input::placeholder{color:rgba(255,255,255,.3)}
+.intake-input:focus{border-color:var(--c1)}
+.intake-input option{background:#1a1814;color:#fff}
+.intake-btn-group{display:flex;gap:8px;flex-wrap:wrap}
+.intake-btn{flex:1;min-width:120px;padding:12px 8px;border-radius:8px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.7);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;text-align:center}
+.intake-btn.selected{background:var(--c1);border-color:var(--c1);color:#fff}
+.intake-btn:hover:not(.selected){border-color:rgba(255,255,255,.5);color:#fff}
+.intake-next{background:var(--c1);color:#fff;border:none;padding:16px;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;cursor:pointer;transition:all .2s;margin-top:8px;box-shadow:0 4px 24px rgba(200,69,58,.3)}
+.intake-next:hover{transform:translateY(-1px);box-shadow:0 6px 28px rgba(200,69,58,.45)}
+.intake-progress{display:flex;gap:6px;margin-bottom:28px}
+.intake-pip{width:28px;height:3px;border-radius:2px;background:rgba(255,255,255,.15);transition:background .3s}
+.intake-pip.active{background:var(--c1)}
+
+/* ── SORTING ── */
+#sorting{background:var(--bg);align-items:center;padding:0 20px}
+.top-bar{width:100%;max-width:700px;display:flex;align-items:center;justify-content:space-between;padding:20px 0 10px}
+.top-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--ink);letter-spacing:1px}
+.top-logo span{color:var(--c1)}
+.progress-wrap{display:flex;align-items:center;gap:10px}
+.progress-bar{width:140px;height:4px;background:var(--rule);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:var(--c1);border-radius:2px;transition:width .4s ease}
+.progress-label{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)}
+.card-stage{flex:1;display:flex;align-items:center;justify-content:center;width:100%;max-width:700px;position:relative;min-height:300px}
+.card-ghost{position:absolute;width:320px;border-radius:16px;background:var(--surface);border:2px solid var(--rule);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.card-ghost:nth-child(1){height:210px;transform:rotate(3deg) translateY(6px);opacity:.35}
+.card-ghost:nth-child(2){height:210px;transform:rotate(-2deg) translateY(3px);opacity:.6}
+.main-card{width:320px;min-height:200px;background:var(--surface);border-radius:16px;border:2px solid var(--rule);box-shadow:0 8px 40px rgba(0,0,0,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px 32px;position:relative;z-index:10;cursor:grab;user-select:none;transition:box-shadow .2s}
+.main-card:active{cursor:grabbing}
+.card-cat-tag{position:absolute;top:14px;left:18px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace}
+.card-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(22px,5vw,36px);text-align:center;line-height:1.05;color:var(--ink)}
+.card-note{font-size:12px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.4;font-style:italic}
+.card-hint{position:absolute;bottom:13px;font-size:11px;color:var(--muted);letter-spacing:1px}
+
+/* colored dots replacing PRESS 1-5 */
+.card-dots{position:absolute;top:14px;right:14px;display:flex;gap:4px;align-items:center}
+.card-dot{width:8px;height:8px;border-radius:50%}
+
+/* undo button */
+.undo-btn{position:absolute;top:20px;right:20px;width:36px;height:36px;border-radius:50%;background:var(--surface);border:1.5px solid var(--rule);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08);transition:all .2s;z-index:20;font-size:15px}
+.undo-btn:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
+.undo-btn:disabled{opacity:.3;cursor:not-allowed}
+.undo-btn:disabled:hover{background:var(--surface);color:var(--ink);border-color:var(--rule)}
+
+.zones-row{width:100%;max-width:820px;display:flex;gap:8px;padding:16px 0 28px;justify-content:center;flex-wrap:wrap}
+.zone{flex:1;min-width:110px;max-width:148px;border-radius:12px;border:2px dashed transparent;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:all .2s;text-align:center}
+.zone[data-cat="1"]{background:rgba(200,69,58,.07);border-color:rgba(200,69,58,.2)}
+.zone[data-cat="2"]{background:rgba(224,123,42,.07);border-color:rgba(224,123,42,.2)}
+.zone[data-cat="3"]{background:rgba(154,149,144,.07);border-color:rgba(154,149,144,.2)}
+.zone[data-cat="4"]{background:rgba(45,91,227,.07);border-color:rgba(45,91,227,.2)}
+.zone[data-cat="5"]{background:rgba(42,157,92,.07);border-color:rgba(42,157,92,.2)}
+.zone.dragover[data-cat="1"]{background:rgba(200,69,58,.18);border-color:var(--c1);transform:scale(1.06)}
+.zone.dragover[data-cat="2"]{background:rgba(224,123,42,.18);border-color:var(--c2);transform:scale(1.06)}
+.zone.dragover[data-cat="3"]{background:rgba(154,149,144,.18);border-color:var(--c3);transform:scale(1.06)}
+.zone.dragover[data-cat="4"]{background:rgba(45,91,227,.18);border-color:var(--c4);transform:scale(1.06)}
+.zone.dragover[data-cat="5"]{background:rgba(42,157,92,.18);border-color:var(--c5);transform:scale(1.06)}
+.zone-emoji{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff}
+.zone[data-cat="1"] .zone-emoji{background:var(--c1)}
+.zone[data-cat="2"] .zone-emoji{background:var(--c2)}
+.zone[data-cat="3"] .zone-emoji{background:var(--c3)}
+.zone[data-cat="4"] .zone-emoji{background:var(--c4)}
+.zone[data-cat="5"] .zone-emoji{background:var(--c5)}
+.zone-lbl{font-size:11px;font-weight:600;letter-spacing:.4px;line-height:1.3}
+.zone[data-cat="1"] .zone-lbl{color:var(--c1)}
+.zone[data-cat="2"] .zone-lbl{color:var(--c2)}
+.zone[data-cat="3"] .zone-lbl{color:var(--c3)}
+.zone[data-cat="4"] .zone-lbl{color:var(--c4)}
+.zone[data-cat="5"] .zone-lbl{color:var(--c5)}
+.zone-cnt{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+@keyframes zFlash{0%{transform:scale(1.08)}100%{transform:scale(1)}}
+.zone.placed{animation:zFlash .25s ease}
+
+/* card animations */
+@keyframes cardFly{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.75) translateY(-24px)}}
+.main-card.flying{animation:cardFly .25s ease forwards;pointer-events:none}
+@keyframes cardIn{0%{opacity:0;transform:scale(.88) translateY(18px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+.main-card.entering{animation:cardIn .3s ease forwards}
+
+/* toast notification */
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a1814;color:#fff;padding:12px 22px;border-radius:100px;font-size:13px;font-weight:600;opacity:0;transition:all .4s ease;z-index:9998;pointer-events:none;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.25)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── LOADING ── */
+#loading{align-items:center;justify-content:center;background:#1a1814}
+.loading-inner{text-align:center;padding:40px;max-width:400px}
+.loading-title{font-family:'Bebas Neue',sans-serif;font-size:52px;color:#fff;line-height:1;margin-bottom:8px}
+.loading-sub{color:rgba(255,255,255,.45);font-size:14px;margin-bottom:40px}
+.dots{display:flex;justify-content:center;gap:8px;margin-bottom:36px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--c1);animation:bounce 1.2s infinite ease-in-out}
+.dot:nth-child(2){animation-delay:.2s;background:var(--c4)}
+.dot:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+.load-steps{text-align:left;max-width:360px;margin:0 auto}
+.load-step{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07);color:rgba(255,255,255,.3);font-size:13px;transition:color .5s}
+.load-step.done{color:rgba(255,255,255,.85)}
+.step-ck{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;transition:all .5s}
+.load-step.done .step-ck{background:var(--c5);border-color:var(--c5);color:#fff}
+
+/* ── RESULTS ── */
+#results{background:var(--bg)}
+.res-header{background:#1a1814;padding:44px 32px 52px;text-align:center}
+.res-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,8vw,74px);color:#fff;line-height:.95}
+.res-title span{color:var(--c1)}
+.res-sub{color:rgba(255,255,255,.4);font-size:13px;margin-top:10px;letter-spacing:3px;text-transform:uppercase}
+.res-body{max-width:800px;margin:0 auto;padding:32px 20px 64px}
+.sum-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:32px;padding:20px;background:var(--surface);border-radius:14px;border:1.5px solid var(--rule)}
+.sum-item{flex:1;min-width:80px;text-align:center}
+.sum-num{font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:1}
+.sum-lbl{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:3px}
+.sec-label{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:14px}
+.pills{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:32px}
+.pill{padding:5px 14px;border-radius:100px;font-size:12px;font-weight:500}
+.pill-must{background:rgba(42,157,92,.12);color:var(--c5);border:1px solid rgba(42,157,92,.28)}
+.pill-like{background:rgba(45,91,227,.1);color:var(--c4);border:1px solid rgba(45,91,227,.22)}
+.schools{display:flex;flex-direction:column;gap:14px}
+.s-card{background:var(--surface);border-radius:16px;border:1.5px solid var(--rule);overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.05);transition:transform .2s,box-shadow .2s}
+.s-card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.1)}
+.s-bar-wrap{height:4px;background:var(--rule)}
+.s-bar{height:100%;transition:width 1s ease}
+.s-inner{display:flex;align-items:center;padding:20px 24px;gap:18px}
+.s-rank{font-family:'Bebas Neue',sans-serif;font-size:44px;color:var(--rule);line-height:1;min-width:46px;text-align:center}
+.s-info{flex:1}
+.s-name{font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1.1;color:var(--ink)}
+.s-loc{font-size:13px;color:var(--muted);margin-top:2px}
+.s-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.s-tag{font-size:11px;padding:3px 10px;border-radius:100px;background:var(--bg);color:var(--muted);border:1px solid var(--rule)}
+.s-pct{text-align:right}
+.s-pct-num{font-family:'Bebas Neue',sans-serif;font-size:46px;line-height:1}
+.s-pct-lbl{font-size:10px;color:var(--muted);letter-spacing:1.5px}
+.s-why{padding:0 24px 18px;font-size:13px;color:var(--muted);line-height:1.7;border-top:1px solid var(--rule);padding-top:14px}
+.res-actions{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
+.btn-sec{flex:1;min-width:150px;padding:16px 20px;border-radius:8px;border:2px solid var(--ink);background:transparent;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;cursor:pointer;transition:all .2s;color:var(--ink)}
+.btn-sec:hover{background:var(--ink);color:var(--bg)}
+.btn-acc{flex:1;min-width:150px;padding:16px 20px;border-radius:8px;border:2px solid var(--c1);background:var(--c1);color:#fff;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;cursor:pointer;transition:all .2s}
+.btn-acc:hover{background:#b03830;border-color:#b03830}
+.btn-share{flex:1;min-width:150px;padding:16px 20px;border-radius:8px;border:2px solid var(--c5);background:var(--c5);color:#fff;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;cursor:pointer;transition:all .2s}
+.btn-share:hover{background:#228a4a;border-color:#228a4a}
+.disclaimer{font-size:11px;color:var(--muted);line-height:1.6;margin-top:28px;padding:14px 18px;background:rgba(0,0,0,.03);border-radius:8px;border:1px solid var(--rule);text-align:center}
+.err-box{background:rgba(200,69,58,.08);border:1.5px solid rgba(200,69,58,.3);border-radius:12px;padding:20px 24px;color:var(--c1);font-size:14px;line-height:1.7;margin-top:20px}
+@media(max-width:480px){
+  .zones-row{gap:5px}
+  .zone{min-width:88px;padding:10px 5px}
+  .zone-lbl{font-size:10px}
+  .main-card{width:290px}
+  .intake-btn-group{gap:6px}
+  .intake-btn{min-width:100px;font-size:12px;padding:10px 6px}
+}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- SPLASH -->
+<div id="splash" class="screen active">
+  <div class="splash-inner">
+    <div class="splash-logo">College<span>360</span></div>
+    <div class="splash-tagline">Find Your Perfect Match</div>
+    <div class="splash-sub2">What are you really looking for?</div>
+    <p class="splash-desc">Sort through topics that matter to you — your values, lifestyle, and goals. Our AI matches you with colleges that fit your life, not just your grades.</p>
+    <button class="btn-primary" onclick="showScreen('intake')">GET STARTED</button>
+    <div class="splash-count" id="totalCount"></div>
+  </div>
+</div>
+
+<!-- INTAKE FORM -->
+<div id="intake" class="screen">
+  <div class="intake-inner">
+    <div class="intake-logo">College<span>360</span></div>
+    <div class="intake-progress">
+      <div class="intake-pip active"></div>
+      <div class="intake-pip active"></div>
+      <div class="intake-pip active"></div>
+      <div class="intake-pip active"></div>
+      <div class="intake-pip active"></div>
+      <div class="intake-pip active"></div>
+    </div>
+    <div class="intake-title">A Few Quick<br>Questions First</div>
+    <div class="intake-sub">Your answers help us narrow down thousands of schools to the ones that genuinely fit you. Takes about a minute.</div>
+    <div class="intake-form">
+
+      <div class="intake-q">
+        <div class="intake-label">1. Where do you currently live?</div>
+        <select class="intake-input" id="q1">
+          <option value="" disabled selected>Select your state</option>
+          <option>Alabama</option><option>Alaska</option><option>Arizona</option><option>Arkansas</option>
+          <option>California</option><option>Colorado</option><option>Connecticut</option><option>Delaware</option>
+          <option>Florida</option><option>Georgia</option><option>Hawaii</option><option>Idaho</option>
+          <option>Illinois</option><option>Indiana</option><option>Iowa</option><option>Kansas</option>
+          <option>Kentucky</option><option>Louisiana</option><option>Maine</option><option>Maryland</option>
+          <option>Massachusetts</option><option>Michigan</option><option>Minnesota</option><option>Mississippi</option>
+          <option>Missouri</option><option>Montana</option><option>Nebraska</option><option>Nevada</option>
+          <option>New Hampshire</option><option>New Jersey</option><option>New Mexico</option><option>New York</option>
+          <option>North Carolina</option><option>North Dakota</option><option>Ohio</option><option>Oklahoma</option>
+          <option>Oregon</option><option>Pennsylvania</option><option>Rhode Island</option><option>South Carolina</option>
+          <option>South Dakota</option><option>Tennessee</option><option>Texas</option><option>Utah</option>
+          <option>Vermont</option><option>Virginia</option><option>Washington</option><option>West Virginia</option>
+          <option>Wisconsin</option><option>Wyoming</option><option>Outside the US</option>
+        </select>
+      </div>
+
+      <div class="intake-q">
+        <div class="intake-label">2. What is your current GPA?</div>
+        <select class="intake-input" id="q2">
+          <option value="" disabled selected>Select your GPA range</option>
+          <option value="4.1 and above">4.1 and above</option>
+          <option value="3.6-4.0">3.6 &ndash; 4.0</option>
+          <option value="3.1-3.5">3.1 &ndash; 3.5</option>
+          <option value="2.6-3.0">2.6 &ndash; 3.0</option>
+          <option value="2.0-2.5">2.0 &ndash; 2.5</option>
+          <option value="1.6-1.9">1.6 &ndash; 1.9</option>
+          <option value="1.5 and below">1.5 and below</option>
+        </select>
+      </div>
+
+      <div class="intake-q">
+        <div class="intake-label">3. What is your SAT or ACT score?</div>
+        <select class="intake-input" id="q3-type" onchange="handleTestType()">
+          <option value="" disabled selected>Select your test situation</option>
+          <option value="SAT">I have an SAT score</option>
+          <option value="ACT">I have an ACT score</option>
+          <option value="test-optional">I'm applying test-optional</option>
+          <option value="not-taken">Haven't taken yet</option>
+        </select>
+        <input class="intake-input" type="number" id="q3-score" placeholder="Enter your score" style="display:none;margin-top:8px" />
+      </div>
+
+      <div class="intake-q">
+        <div class="intake-label">4. What yearly tuition range works for you?</div>
+        <select class="intake-input" id="q4">
+          <option value="" disabled selected>Select your range</option>
+          <option value="under-15k">Under $15,000 / year</option>
+          <option value="15k-30k">$15,000 &ndash; $30,000 / year</option>
+          <option value="30k-50k">$30,000 &ndash; $50,000 / year</option>
+          <option value="50k-70k">$50,000 &ndash; $70,000 / year</option>
+          <option value="70k-plus">$70,000+ / year (no real limit)</option>
+          <option value="need-aid">I'll need significant financial aid regardless</option>
+          <option value="not-sure">Not sure yet</option>
+        </select>
+      </div>
+
+      <div class="intake-q">
+        <div class="intake-label">5. What do you want to study?</div>
+        <select class="intake-input" id="q5">
+          <option value="" disabled selected>Select a major</option>
+          <option value="Undecided">Undecided</option>
+          <option>Agriculture &amp; Sustainability</option>
+          <option>Animal Science</option>
+          <option>Architecture</option>
+          <option>Art</option>
+          <option>Astronomy</option>
+          <option>Biology</option>
+          <option>Business</option>
+          <option>Chemistry</option>
+          <option>Communications &amp; Journalism</option>
+          <option>Computer Science</option>
+          <option>Construction Management</option>
+          <option>Criminal Justice</option>
+          <option>Culinary Arts</option>
+          <option>Dance</option>
+          <option>Drama / Theater</option>
+          <option>Economics</option>
+          <option>Education / Teaching</option>
+          <option>Engineering</option>
+          <option>English</option>
+          <option>Environmental Science</option>
+          <option>Ethnic &amp; Cultural Studies</option>
+          <option>Fashion Design</option>
+          <option>Film</option>
+          <option>Foreign Language &amp; Linguistics</option>
+          <option>Geology</option>
+          <option>Global Studies</option>
+          <option>Graphic Design / UX Design</option>
+          <option>History</option>
+          <option>Hospitality Management</option>
+          <option>International Relations</option>
+          <option>Liberal Arts (broad humanities focus)</option>
+          <option>Math</option>
+          <option>Military Studies</option>
+          <option>Music</option>
+          <option>Neuroscience</option>
+          <option>Nursing</option>
+          <option>Philosophy</option>
+          <option>Physics</option>
+          <option>Political Science</option>
+          <option>Pre-Law</option>
+          <option>Pre-Med / Health Sciences</option>
+          <option>Product / Industrial Design</option>
+          <option>Psychology</option>
+          <option>Public Health</option>
+          <option>Social Entrepreneurship</option>
+          <option>Sociology</option>
+          <option>Sports Management</option>
+          <option>Sports Medicine &amp; Kinesiology</option>
+          <option>Statistics &amp; Analytics</option>
+          <option>Veterinary Science / Pre-Vet</option>
+        </select>
+      </div>
+
+      <div class="intake-q">
+        <div class="intake-label">6. What grade in high school are you?</div>
+        <div class="intake-btn-group" id="q6group">
+          <button class="intake-btn" onclick="selectGrade(this,'Freshman')">Freshman</button>
+          <button class="intake-btn" onclick="selectGrade(this,'Sophomore')">Sophomore</button>
+          <button class="intake-btn" onclick="selectGrade(this,'Junior')">Junior</button>
+          <button class="intake-btn" onclick="selectGrade(this,'Senior')">Senior</button>
+          <button class="intake-btn" onclick="selectGrade(this,'Other')">Other</button>
+        </div>
+      </div>
+
+      <button class="intake-next" onclick="startSorting()">START SORTING →</button>
+    </div>
+  </div>
+</div>
+
+<!-- SORTING -->
+<div id="sorting" class="screen">
+  <div class="top-bar">
+    <div class="top-logo">College<span>360</span></div>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="pFill" style="width:0%"></div></div>
+      <div class="progress-label" id="pLabel">0 / 0</div>
+    </div>
+  </div>
+  <div class="card-stage" style="position:relative">
+    <button class="undo-btn" id="undoBtn" onclick="undoCard()" disabled title="Undo last card">↩</button>
+    <div class="card-ghost"></div>
+    <div class="card-ghost"></div>
+    <div class="main-card" id="mainCard" draggable="true">
+      <div class="card-cat-tag" id="cardTag"></div>
+      <div class="card-dots">
+        <div class="card-dot" style="background:var(--c1)"></div>
+        <div class="card-dot" style="background:var(--c2)"></div>
+        <div class="card-dot" style="background:var(--c3)"></div>
+        <div class="card-dot" style="background:var(--c4)"></div>
+        <div class="card-dot" style="background:var(--c5)"></div>
+      </div>
+      <div class="card-name" id="cardName"></div>
+      <div class="card-note" id="cardNote"></div>
+      <div class="card-hint">drag or tap a category below</div>
+    </div>
+  </div>
+  <div class="zones-row">
+    <div class="zone" data-cat="1" onclick="placeCard(1)">
+      <div class="zone-emoji">✕</div>
+      <div class="zone-lbl">Not For Me</div>
+      <div class="zone-cnt" id="cnt1">0 cards</div>
+    </div>
+    <div class="zone" data-cat="2" onclick="placeCard(2)">
+      <div class="zone-emoji">↓</div>
+      <div class="zone-lbl">Would Rather Not</div>
+      <div class="zone-cnt" id="cnt2">0 cards</div>
+    </div>
+    <div class="zone" data-cat="3" onclick="placeCard(3)">
+      <div class="zone-emoji">–</div>
+      <div class="zone-lbl">Doesn't Matter</div>
+      <div class="zone-cnt" id="cnt3">0 cards</div>
+    </div>
+    <div class="zone" data-cat="4" onclick="placeCard(4)">
+      <div class="zone-emoji">↑</div>
+      <div class="zone-lbl">Would Like This</div>
+      <div class="zone-cnt" id="cnt4">0 cards</div>
+    </div>
+    <div class="zone" data-cat="5" onclick="placeCard(5)">
+      <div class="zone-emoji">★</div>
+      <div class="zone-lbl">Must Have</div>
+      <div class="zone-cnt" id="cnt5">0 cards</div>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading" class="screen">
+  <div class="loading-inner">
+    <div class="loading-title">Finding Your<br>Best Matches</div>
+    <div class="loading-sub">Analyzing thousands of schools just for you</div>
+    <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    <div class="load-steps">
+      <div class="load-step" id="ls1"><div class="step-ck">✓</div><span>Reading your priorities...</span></div>
+      <div class="load-step" id="ls2"><div class="step-ck">✓</div><span>Filtering 4,000+ schools...</span></div>
+      <div class="load-step" id="ls3"><div class="step-ck">✓</div><span>Checking your must-haves...</span></div>
+      <div class="load-step" id="ls4"><div class="step-ck">✓</div><span>Weighing your deal-breakers...</span></div>
+      <div class="load-step" id="ls5"><div class="step-ck">✓</div><span>Analyzing campus culture fit...</span></div>
+      <div class="load-step" id="ls6"><div class="step-ck">✓</div><span>Matching your location preferences...</span></div>
+      <div class="load-step" id="ls7"><div class="step-ck">✓</div><span>Comparing academic programs...</span></div>
+      <div class="load-step" id="ls8"><div class="step-ck">✓</div><span>Your matches are almost ready...</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div id="results" class="screen">
+  <div class="res-header">
+    <div class="res-title">Your Top<br><span>College Matches</span></div>
+    <div class="res-sub">Based on your College 360 Profile</div>
+  </div>
+  <div class="res-body">
+    <div class="sum-strip" id="sumStrip"></div>
+    <div class="sec-label">Your Must-Haves & Top Priorities</div>
+    <div class="pills" id="pills"></div>
+    <div class="sec-label">Your Matched Schools</div>
+    <div class="schools" id="schoolsList"></div>
+    <div class="res-actions">
+      <button class="btn-sec" onclick="resetApp()">START OVER</button>
+      <button class="btn-sec" onclick="retakeSort()">RETAKE SORT</button>
+      <button class="btn-share" onclick="shareResults()">SHARE RESULTS</button>
+    </div>
+    <div class="disclaimer">
+      School recommendations are generated by AI and are for informational purposes only. They do not guarantee admission or constitute professional college counseling advice. Always verify information directly with each institution.
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// COLLEGE 360 — DRAFT 3
+// All feedback changes applied:
+// - 4-question intake form
+// - Parenthetical notes on vague cards
+// - Circular undo button
+// - 5 colored dots replace PRESS 1-5
+// - New zone names: Not For Me, Would Rather Not, Doesn't Matter, Would Like This, Must Have
+// - "Design My Own Major" removed
+// - "Medium College" → "Medium Sized College"
+// - "Pre-Med Advising" → "Dedicated Pre-Med Advising Office"
+// - 75% toast notification
+// - Extended 10-second loading with story steps
+// - Share + Retake buttons on results
+// - Intake data passed to AI backend
+// - AI disclaimer on results
+// ================================================================
+
+// ── INTAKE STATE ──────────────────────────────────────────────
+let intakeData = {
+  location:'',
+  gpa:'',
+  testType:'',
+  testScore:'',
+  budget:'',
+  major:'',
+  grade:''
+};
+
+function selectGrade(btn, value) {
+  document.querySelectorAll('#q6group .intake-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  intakeData.grade = value;
+}
+
+function handleTestType() {
+  const type = document.getElementById('q3-type').value;
+  const scoreInput = document.getElementById('q3-score');
+  if (type === 'SAT') {
+    scoreInput.style.display = 'block';
+    scoreInput.placeholder = 'Enter your SAT score (e.g. 1350)';
+    scoreInput.min = 400; scoreInput.max = 1600;
+  } else if (type === 'ACT') {
+    scoreInput.style.display = 'block';
+    scoreInput.placeholder = 'Enter your ACT score (e.g. 28)';
+    scoreInput.min = 1; scoreInput.max = 36;
+  } else {
+    scoreInput.style.display = 'none';
+    scoreInput.value = '';
+  }
+  intakeData.testType = type;
+}
+
+function startSorting() {
+  intakeData.location  = document.getElementById('q1').value || 'Not specified';
+  intakeData.gpa       = document.getElementById('q2').value || 'Not specified';
+  intakeData.testType  = document.getElementById('q3-type').value || 'Not specified';
+  intakeData.testScore = document.getElementById('q3-score').value || 'N/A';
+  intakeData.budget    = document.getElementById('q4').value || 'Not specified';
+  intakeData.major     = document.getElementById('q5').value || 'Not specified';
+  if (!intakeData.grade) intakeData.grade = 'Not specified';
+  showScreen('sorting');
+  renderCard();
+}
+
+// ── ALL CARDS ─────────────────────────────────────────────────
+// Draft 5 — Fully audited card deck (162 cards total)
+const ALL_CARDS=[
+  // FIELDS OF STUDY (49 — added Veterinary Science / Pre-Vet, renamed Liberal Arts)
+  {name:"Sports Medicine & Kinesiology",cat:"Fields of Study"},
+  {name:"International Relations",cat:"Fields of Study"},
+  {name:"Engineering",cat:"Fields of Study"},
+  {name:"Fashion Design",cat:"Fields of Study"},
+  {name:"Sociology",cat:"Fields of Study"},
+  {name:"Business",cat:"Fields of Study"},
+  {name:"Philosophy",cat:"Fields of Study"},
+  {name:"Sports Management",cat:"Fields of Study"},
+  {name:"Communications & Journalism",cat:"Fields of Study"},
+  {name:"Liberal Arts",cat:"Fields of Study",note:"Broad humanities focus across disciplines"},
+  {name:"Psychology",cat:"Fields of Study"},
+  {name:"Physics",cat:"Fields of Study"},
+  {name:"Geology",cat:"Fields of Study",note:"Study of earth's rocks, minerals & history"},
+  {name:"Education / Teaching",cat:"Fields of Study"},
+  {name:"Public Health",cat:"Fields of Study",note:"Health systems, policy & community wellness"},
+  {name:"Criminal Justice",cat:"Fields of Study"},
+  {name:"Dance",cat:"Fields of Study"},
+  {name:"Statistics & Analytics",cat:"Fields of Study"},
+  {name:"Foreign Language & Linguistics",cat:"Fields of Study",note:"Language structure, culture & translation"},
+  {name:"History",cat:"Fields of Study"},
+  {name:"Film",cat:"Fields of Study"},
+  {name:"Animal Science",cat:"Fields of Study"},
+  {name:"English",cat:"Fields of Study"},
+  {name:"Environmental Science",cat:"Fields of Study"},
+  {name:"Chemistry",cat:"Fields of Study"},
+  {name:"Economics",cat:"Fields of Study"},
+  {name:"Culinary Arts",cat:"Fields of Study"},
+  {name:"Astronomy",cat:"Fields of Study"},
+  {name:"Math",cat:"Fields of Study"},
+  {name:"Political Science",cat:"Fields of Study"},
+  {name:"Music",cat:"Fields of Study"},
+  {name:"Nursing",cat:"Fields of Study"},
+  {name:"Hospitality Management",cat:"Fields of Study"},
+  {name:"Drama / Theater",cat:"Fields of Study"},
+  {name:"Construction Management",cat:"Fields of Study"},
+  {name:"Biology",cat:"Fields of Study"},
+  {name:"Neuroscience",cat:"Fields of Study"},
+  {name:"Computer Science",cat:"Fields of Study"},
+  {name:"Agriculture & Sustainability",cat:"Fields of Study"},
+  {name:"Ethnic & Cultural Studies",cat:"Fields of Study",note:"Race, ethnicity & cultural identity studies"},
+  {name:"Military Studies",cat:"Fields of Study"},
+  {name:"Product / Industrial Design",cat:"Fields of Study"},
+  {name:"Social Entrepreneurship",cat:"Fields of Study",note:"Business ventures focused on social good"},
+  {name:"Global Studies",cat:"Fields of Study"},
+  {name:"Art",cat:"Fields of Study"},
+  {name:"Architecture",cat:"Fields of Study"},
+  {name:"Pre-Law",cat:"Fields of Study"},
+  {name:"Pre-Med / Health Sciences",cat:"Fields of Study"},
+  {name:"Graphic Design / UX Design",cat:"Fields of Study"},
+  {name:"Veterinary Science / Pre-Vet",cat:"Fields of Study",note:"Animal medicine & veterinary career path"},
+
+  // LOCATION (9 — unchanged)
+  {name:"Rocky Mountains (CO, ID, MT, UT, WY)",cat:"Location"},
+  {name:"International",cat:"Location"},
+  {name:"Southwest (AZ, NM, OK, TX)",cat:"Location"},
+  {name:"Great Lakes (MI, IL, IN, OH, WI)",cat:"Location"},
+  {name:"Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)",cat:"Location"},
+  {name:"Mid-Atlantic (DE, MD, NJ, NY, PA, DC)",cat:"Location"},
+  {name:"New England (CT, ME, MA, NH, RI, VT)",cat:"Location"},
+  {name:"Plains (IA, KS, MN, MO, NE, ND, SD)",cat:"Location"},
+  {name:"West Coast (AK, CA, HI, NV, OR, WA)",cat:"Location"},
+
+  // CAMPUS & SETTING (22 — removed Lots of Sunlight, added 3 new, renamed 2)
+  {name:"Bike Friendly Campus",cat:"Campus & Setting",note:"Safe paths & strong cycling community"},
+  {name:"Walkable Campus",cat:"Campus & Setting",note:"Compact, navigable layout"},
+  {name:"Near Major Airport",cat:"Campus & Setting",note:"Easy travel home & abroad"},
+  {name:"Mountain or Beach Access",cat:"Campus & Setting",note:"Skiing, surfing, hiking nearby"},
+  {name:"Modern Facilities",cat:"Campus & Setting",note:"New labs, dorms & classrooms"},
+  {name:"Far From Home",cat:"Campus & Setting"},
+  {name:"Close to Home",cat:"Campus & Setting"},
+  {name:"College Town",cat:"Campus & Setting",note:"Town centered around campus life"},
+  {name:"Suburban Setting",cat:"Campus & Setting"},
+  {name:"Rural Setting",cat:"Campus & Setting"},
+  {name:"City Campus",cat:"Campus & Setting"},
+  {name:"Scenic / Beautiful Campus",cat:"Campus & Setting"},
+  {name:"Great Dorms",cat:"Campus & Setting"},
+  {name:"Snow",cat:"Campus & Setting"},
+  {name:"Warm Weather",cat:"Campus & Setting"},
+  {name:"Residential Campus",cat:"Campus & Setting",note:"Most students live on campus all 4 years"},
+  {name:"Things to Do on Weekends",cat:"Campus & Setting",note:"Vibrant on-campus & nearby events"},
+  {name:"Campus Safety",cat:"Campus & Setting",note:"Low crime rates & strong security presence"},
+  {name:"Public Transportation Access",cat:"Campus & Setting",note:"Easy access to buses, trains, or metro"},
+  {name:"Small College",cat:"Campus & Setting"},
+  {name:"Medium Sized College",cat:"Campus & Setting"},
+  {name:"Large College",cat:"Campus & Setting"},
+
+  // ACTIVITIES & INVOLVEMENT (11 — added Required Internships, renamed Cultural Events)
+  {name:"Good Gym / Rec Center",cat:"Activities & Involvement"},
+  {name:"Cultural Events",cat:"Activities & Involvement",note:"Concerts, art shows, lectures, festivals"},
+  {name:"Community Service",cat:"Activities & Involvement"},
+  {name:"Clubs",cat:"Activities & Involvement"},
+  {name:"Varsity Sports",cat:"Activities & Involvement"},
+  {name:"Intramural Sports",cat:"Activities & Involvement",note:"Recreational sports leagues for all students"},
+  {name:"Research Opportunities",cat:"Activities & Involvement",note:"Work alongside professors on original research"},
+  {name:"Required Internships",cat:"Activities & Involvement",note:"Internships built into the curriculum"},
+  {name:"Music / Performing Arts Scene",cat:"Activities & Involvement"},
+  {name:"ROTC",cat:"Activities & Involvement",note:"Military officer training program on campus"},
+  {name:"Study Abroad",cat:"Activities & Involvement",note:"Earn credits while studying in another country"},
+
+  // RESOURCES & SUPPORT (17 — added 4 new, moved in ACT/SAT Optional and Gap Year Friendly)
+  {name:"Tutoring",cat:"Resources & Support"},
+  {name:"Career Services & Job Placement",cat:"Resources & Support"},
+  {name:"Internship Programs",cat:"Resources & Support"},
+  {name:"High Job Placement Rate",cat:"Resources & Support",note:"% of grads landing jobs after graduation"},
+  {name:"On-Campus Recruiting / Career Fairs",cat:"Resources & Support",note:"Major employers actively recruiting on campus"},
+  {name:"Direct Admit to Major",cat:"Resources & Support",note:"Admitted straight into competitive majors"},
+  {name:"Community College Transfer Pathway",cat:"Resources & Support",note:"Articulation agreements with 4-year schools"},
+  {name:"Dedicated Pre-Med Advising Office",cat:"Resources & Support",note:"Specialized advisors for pre-med students"},
+  {name:"Honors College",cat:"Resources & Support",note:"Selective program with enhanced coursework"},
+  {name:"Disability Support",cat:"Resources & Support",note:"Physical & learning disability services"},
+  {name:"Financial Aid",cat:"Resources & Support"},
+  {name:"Easy Access to Professors",cat:"Resources & Support"},
+  {name:"Mental Health Support",cat:"Resources & Support"},
+  {name:"Strong Alumni Network",cat:"Resources & Support",note:"Active graduates who help students with careers"},
+  {name:"Scholarships & Merit Aid",cat:"Resources & Support"},
+  {name:"On-Campus Health Services",cat:"Resources & Support"},
+  {name:"Athlete Recruitment",cat:"Resources & Support",note:"Being actively recruited to play a college sport"},
+  {name:"ACT/SAT Optional",cat:"Resources & Support",note:"No standardized test score required"},
+  {name:"Gap Year Friendly",cat:"Resources & Support",note:"Defer enrollment for a year after high school"},
+
+  // CAMPUS CULTURE (28 — merged 3 redundant cards, added 3 new, moved in HBCU and HSI, renamed 2)
+  {name:"Welcoming, Close-Knit Community",cat:"Campus Culture",note:"Students help each other, easy to make friends"},
+  {name:"Party School",cat:"Campus Culture"},
+  {name:"Outdoors Culture",cat:"Campus Culture"},
+  {name:"School Spirit",cat:"Campus Culture"},
+  {name:"Liberal Campus",cat:"Campus Culture"},
+  {name:"Social Justice Focus",cat:"Campus Culture"},
+  {name:"Work Hard Play Hard",cat:"Campus Culture",note:"Intense academics + active social life"},
+  {name:"Politically Aware",cat:"Campus Culture",note:"Active engagement in current events & politics"},
+  {name:"Conservative Campus",cat:"Campus Culture"},
+  {name:"Religious Campus",cat:"Campus Culture"},
+  {name:"Big Fish Small Pond",cat:"Campus Culture",note:"Stand out & lead on a smaller campus"},
+  {name:"LGBTQ+ Friendly",cat:"Campus Culture"},
+  {name:"Green / Eco Campus",cat:"Campus Culture"},
+  {name:"Women Only",cat:"Campus Culture"},
+  {name:"HBCU",cat:"Campus Culture",note:"Historically Black College or University"},
+  {name:"Hispanic Serving Institution",cat:"Campus Culture",note:"50%+ Hispanic student enrollment"},
+  {name:"Diverse Campus",cat:"Campus Culture",note:"Racial, socioeconomic & geographic diversity"},
+  {name:"Active International Student Community",cat:"Campus Culture",note:"Strong global student presence"},
+  {name:"Lots of Free Time",cat:"Campus Culture"},
+  {name:"Creative Culture",cat:"Campus Culture"},
+  {name:"Tech / Startup Culture",cat:"Campus Culture",note:"Innovation & entrepreneurship focused"},
+  {name:"Strong Arts & Music Scene",cat:"Campus Culture",note:"Vibrant performing & visual arts community"},
+  {name:"Greek Life",cat:"Campus Culture",note:"Sorority & fraternity community"},
+  {name:"Good Food / Dining",cat:"Campus Culture"},
+  {name:"National Reputation",cat:"Campus Culture"},
+  {name:"Sense of Belonging",cat:"Campus Culture",note:"Feel personally accepted & at home"},
+  {name:"First-Generation Student Friendly",cat:"Campus Culture",note:"First in family to attend college"},
+  {name:"Veteran Friendly",cat:"Campus Culture"},
+  {name:"Low Cost of Living Area",cat:"Campus Culture",note:"Affordable city or town surrounding campus"},
+
+  // LEARNING ENVIRONMENT (26 — moved 4 out, added 3 new, renamed 2)
+  {name:"Learn by Discussion",cat:"Learning Environment"},
+  {name:"Learn by Listening",cat:"Learning Environment"},
+  {name:"Learn by Reading",cat:"Learning Environment"},
+  {name:"Hands-On Learning",cat:"Learning Environment"},
+  {name:"Competitive Environment",cat:"Learning Environment"},
+  {name:"Collaborative Environment",cat:"Learning Environment"},
+  {name:"Small Classes",cat:"Learning Environment"},
+  {name:"Large Classes",cat:"Learning Environment"},
+  {name:"Structured Program",cat:"Learning Environment",note:"Clear required courses & set curriculum"},
+  {name:"Unstructured Program",cat:"Learning Environment",note:"Design your own academic path"},
+  {name:"I Thrive Under Academic Pressure",cat:"Learning Environment"},
+  {name:"I Want to Be a Top Student",cat:"Learning Environment",note:"Graduate near the top of your class"},
+  {name:"Love of Learning",cat:"Learning Environment"},
+  {name:"Scholarly Environment",cat:"Learning Environment",note:"Research-driven, academically focused culture"},
+  {name:"Highly Rated Teaching Faculty",cat:"Learning Environment",note:"Professors known for excellent teaching"},
+  {name:"Wide Range of Classes & Majors",cat:"Learning Environment"},
+  {name:"Easy to Change Majors",cat:"Learning Environment",note:"Switch majors without falling behind"},
+  {name:"Double Major Friendly",cat:"Learning Environment",note:"Logistically easy to pursue two majors"},
+  {name:"Senior Thesis or Capstone Required",cat:"Learning Environment",note:"In-depth final project to graduate"},
+  {name:"Accelerated Programs",cat:"Learning Environment",note:"Complete your degree in 3 years or less"},
+  {name:"Co-Op Programs",cat:"Learning Environment",note:"Alternating paid work semesters with school"},
+  {name:"Apprenticeships, Trades & Certifications",cat:"Learning Environment",note:"Hands-on vocational & trade training"},
+  {name:"Online / Hybrid Options",cat:"Learning Environment",note:"Mix of in-person and remote coursework"},
+  {name:"Good Graduation Rate",cat:"Learning Environment",note:"High % of students finish their degree"},
+];];
+
+// ── STATE ─────────────────────────────────────────────────────
+let cards=[],idx=0,placements={},counts={1:0,2:0,3:0,4:0,5:0};
+let toastTimer=null, toastShown=false;
+
+function init(){
+  cards=[...ALL_CARDS].sort(()=>Math.random()-.5);
+  document.getElementById('totalCount').textContent=`${cards.length} cards across 7 categories`;
+}
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── CARD RENDERING ────────────────────────────────────────────
+function renderCard(){
+  if(idx>=cards.length){finishSorting();return;}
+
+  // 75% toast
+  if(!toastShown && idx>=Math.floor(cards.length*.75)){
+    toastShown=true;
+    const remaining=cards.length-idx;
+    showToast(`Almost there — ${remaining} cards left!`);
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured' });
+  const card=cards[idx];
+  const el=document.getElementById('mainCard');
+  document.getElementById('cardName').textContent=card.name;
+  document.getElementById('cardTag').textContent=card.cat;
+  const noteEl=document.getElementById('cardNote');
+  noteEl.textContent=card.note?`(${card.note})`:'';
+  el.classList.remove('flying');
+  el.classList.add('entering');
+  setTimeout(()=>el.classList.remove('entering'),350);
+  const pct=Math.round((idx/cards.length)*100);
+  document.getElementById('pFill').style.width=pct+'%';
+  document.getElementById('pLabel').textContent=`${idx} / ${cards.length}`;
+  for(let i=1;i<=5;i++){
+    const c=counts[i];
+    document.getElementById('cnt'+i).textContent=c+(c===1?' card':' cards');
   }
+  document.getElementById('undoBtn').disabled=(idx===0);
+}
 
-  try {
-    const { mustHave, wouldLike, dontCare, preferNot, dontLike, studentProfile } = req.body;
-    const p = studentProfile || {};
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),4000);
+}
 
-    const profileContext = `
-STUDENT PROFILE (use this to calibrate every recommendation):
-- Home state: ${p.location || 'Not specified'}
-- GPA range: ${p.gpa || 'Not specified'}
-- Standardized testing: ${p.testType || 'Not specified'}${p.testScore && p.testScore !== 'N/A' ? ` (Score: ${p.testScore})` : ''}
-- Annual tuition budget: ${p.budget || 'Not specified'}
-- Intended major: ${p.major || 'Not specified'}
-- Grade level: ${p.grade || 'Not specified'}`;
+// ── PLACEMENT ─────────────────────────────────────────────────
+function placeCard(cat){
+  placements[idx]=cat;
+  counts[cat]++;
+  const el=document.getElementById('mainCard');
+  el.classList.add('flying');
+  const zone=document.querySelector(`.zone[data-cat="${cat}"]`);
+  zone.classList.add('placed');
+  setTimeout(()=>zone.classList.remove('placed'),300);
+  idx++;
+  setTimeout(()=>renderCard(),260);
+}
 
-    const prompt = `You are an expert college counselor with encyclopedic, fact-based knowledge of US colleges and universities. A student has completed the College 360 preference card sort. Your job is to recommend their top 8 best-fit colleges with extreme precision and accuracy.
+// ── UNDO ──────────────────────────────────────────────────────
+function undoCard(){
+  if(idx===0)return;
+  idx--;
+  const prevCat=placements[idx];
+  if(prevCat) counts[prevCat]=Math.max(0,counts[prevCat]-1);
+  delete placements[idx];
+  renderCard();
+}
 
-${profileContext}
+// ── DESKTOP DRAG ─────────────────────────────────────────────
+const mc=document.getElementById('mainCard');
+mc.addEventListener('dragstart',e=>{
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(()=>mc.style.opacity='.4',0);
+});
+mc.addEventListener('dragend',()=>{
+  mc.style.opacity='1';
+  document.querySelectorAll('.zone').forEach(z=>z.classList.remove('dragover'));
+});
+document.querySelectorAll('.zone').forEach(z=>{
+  z.addEventListener('dragover',e=>{
+    e.preventDefault();
+    document.querySelectorAll('.zone').forEach(x=>x.classList.remove('dragover'));
+    z.classList.add('dragover');
+  });
+  z.addEventListener('dragleave',()=>z.classList.remove('dragover'));
+  z.addEventListener('drop',e=>{
+    e.preventDefault();
+    z.classList.remove('dragover');
+    mc.style.opacity='1';
+    placeCard(parseInt(z.dataset.cat));
+  });
+});
 
-STUDENT CARD SORT PREFERENCES:
-MUST HAVE (deal-maker — school must satisfy these or it cannot be recommended): ${mustHave.join(', ') || 'none'}
-WOULD LIKE THIS (high priority — strongly weight these in scoring): ${wouldLike.join(', ') || 'none'}
-DOESN'T MATTER (neutral): ${dontCare.join(', ') || 'none'}
-WOULD RATHER NOT (negative weight — penalize schools with these traits): ${preferNot.join(', ') || 'none'}
-NOT FOR ME (deal-breaker — automatically disqualify any school strongly associated with these): ${dontLike.join(', ') || 'none'}
-
-PROFILE-BASED CALIBRATION RULES (apply BEFORE looking at card sort):
-
-ADMISSIBILITY (use GPA + test score together):
-- GPA 4.1+ with SAT 1450+ or ACT 33+: include 2-3 highly selective schools (acceptance rate under 20%)
-- GPA 3.6-4.0 with SAT 1300-1450 or ACT 28-32: focus on selective and mid-selective (acceptance 20-50%)
-- GPA 3.1-3.5 with SAT 1100-1290 or ACT 22-27: focus on accessible schools (acceptance 50-80%), 1-2 reach max
-- GPA 2.6-3.0: focus on accessible/open admission schools (acceptance 70%+)
-- GPA 2.0-2.5: prioritize accessible schools, community college transfer pathways
-- GPA 1.6-1.9: focus heavily on open admission schools, community colleges, schools with strong academic support and transfer pathways
-- GPA 1.5 and below: prioritize community colleges, trade schools, certification programs, and schools with extensive academic support
-- Test-optional or no scores: rely on GPA alone, lean conservative on selectivity
-
-BUDGET FILTERING (hard filter):
-- Under $15,000/year: prioritize in-state public universities, community colleges, schools with major scholarships
-- $15,000-$30,000/year: in-state publics, some out-of-state publics with good aid, private schools that meet full need
-- $30,000-$50,000/year: most public universities, private schools with strong need-based aid
-- $50,000-$70,000/year: full range of private universities and elite publics
-- $70,000+/year: any school, no cost filter
-- Needs significant financial aid: prioritize schools with strongest aid (Ivies, top liberal arts colleges, large publics with aid)
-
-MAJOR PRIORITIZATION:
-- If specific major selected: only recommend schools genuinely strong in that field
-- Engineering: only ABET-accredited engineering programs
-- Pre-Med: only schools with strong pre-med advising and medical school placement
-- Business: only accredited business schools or strong undergrad business programs
-- Nursing: only CCNE or ACEN-accredited nursing programs
-- Veterinary Science / Pre-Vet: only schools with strong animal science and pre-vet advising
-- Undecided: prioritize schools with strong general academics and ability to explore many majors
-
-GRADE LEVEL CONTEXT:
-- Freshman/Sophomore: early exploration — wider variety to broaden horizons
-- Junior: active list building — realistic future application list
-- Senior: final list building — only schools they could genuinely apply to and afford
-- Other: balance broadly
-
-ACCURACY RULES — follow strictly:
-
-LOCATION: Only recommend schools physically located in preferred regions if location cards were sorted.
-- Rocky Mountains = CO, ID, MT, UT, WY
-- West Coast = CA, OR, WA, NV, HI, AK
-- Southeast = AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV
-- Mid-Atlantic = DE, MD, NJ, NY, PA, DC
-- New England = CT, ME, MA, NH, RI, VT
-- Great Lakes = MI, IL, IN, OH, WI
-- Plains = IA, KS, MN, MO, NE, ND, SD
-- Southwest = AZ, NM, OK, TX
-If region marked Not For Me, never recommend schools from that region.
-
-SIZE:
-- Small College = under 3,000 undergrads
-- Medium Sized College = 3,000 to 15,000 undergrads
-- Large College = over 15,000 undergrads
-
-CULTURE & IDENTITY (now in Campus Culture):
-- HBCU: only schools officially designated as Historically Black Colleges and Universities
-- Hispanic Serving Institution: only schools with official HSI federal designation
-- Women Only: only actual women's colleges
-- Religious Campus: only schools with active religious identity
-- LGBTQ+ Friendly: only schools with documented inclusive policies
-- Conservative Campus: only schools widely known for conservative student culture
-- Party School: only schools with documented party culture
-- Active International Student Community: only schools with 10%+ international enrollment
-- Tech / Startup Culture: schools like Stanford, MIT, CMU, Georgia Tech, Northeastern
-- Strong Arts & Music Scene: schools with strong undergraduate arts presence
-
-OUTCOMES (in Resources & Support):
-- High Job Placement Rate: only schools with documented 85%+ placement within 6 months of graduation
-- Direct Admit to Major: schools where students are admitted directly into competitive majors (vs. internal application)
-- On-Campus Recruiting / Career Fairs: schools where major employers (Big 4, FAANG, finance) actively recruit
-- Community College Transfer Pathway: schools with strong articulation agreements with community colleges
-- Required Internships: schools that require internships for graduation (Northeastern, Drexel, Cincinnati, etc.)
-
-ACADEMIC FLEXIBILITY (in Learning Environment):
-- Easy to Change Majors: schools known for flexible major switching without falling behind
-- Double Major Friendly: schools where double majoring is logistically supported
-- Senior Thesis or Capstone Required: schools requiring substantial final projects
-
-WEATHER: If Snow is Not For Me, never recommend schools in MN, WI, VT, ME, NH, ND, SD, MI, upstate NY. If Warm Weather is Must Have, only schools in FL, TX, AZ, CA, HI.
-
-FIT SCORING:
-- 90-97%: matches profile (GPA/budget/major) AND nearly all card must-haves
-- 75-89%: matches profile and most card must-haves with minor gaps
-- 60-74%: matches profile but only some card preferences
-- 52-59%: included for diversity but has notable gaps
-Never give above 80% unless school genuinely matches majority of profile filters AND card priorities.
-
-EXPLANATION: The "why" field must cite specific, verifiable facts directly tied to the student's profile AND preferences. Reference their GPA fit, budget fit, major strength, and specific cultural/outcome cards when relevant. Never use generic phrases like "great academics."
-
-SCHOOL DIVERSITY: Include a mix of:
-- At least 2 nationally recognized universities
-- At least 2 strong regional schools the student may not have considered
-- At least 1 smaller or lesser-known school that is a genuine hidden gem fit
-- Schools across different price points within budget range
-
-Return ONLY valid JSON — no markdown, no explanation, no backticks, no preamble.
-Return a JSON array of exactly 8 school objects. Each object must have:
-- "name": full official school name
-- "location": city, state (e.g. "Ann Arbor, MI")
-- "fitPercent": honest integer between 52 and 97
-- "tags": array of exactly 4 short factual strings explaining the match (include cost tier, size, key program, and one cultural/location fact)
-- "why": exactly 2 sentences. Sentence 1: cite 2-3 specific verifiable facts connecting this school to the student's profile and preferences. Sentence 2: one honest caveat or important thing to know about this school.
-
-Order by fitPercent descending. Be rigorous, accurate, and specific.`;
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-opus-4-5',
-        max_tokens: 2500,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      return res.status(response.status).json({ error: errorData });
+// ── TOUCH DRAG ───────────────────────────────────────────────
+let tClone=null;
+mc.addEventListener('touchstart',e=>{
+  const t=e.touches[0],r=mc.getBoundingClientRect();
+  tClone=mc.cloneNode(true);
+  tClone.style.cssText=`position:fixed;width:${r.width}px;height:${r.height}px;pointer-events:none;z-index:9999;opacity:.92;left:${t.clientX-r.width/2}px;top:${t.clientY-r.height/2}px;transform:rotate(3deg) scale(1.05);box-shadow:0 20px 60px rgba(0,0,0,.25);border-radius:16px;background:#fff;`;
+  document.body.appendChild(tClone);
+  mc.style.opacity='.3';
+},{passive:true});
+mc.addEventListener('touchmove',e=>{
+  if(!tClone)return;
+  const t=e.touches[0];
+  tClone.style.left=(t.clientX-tClone.offsetWidth/2)+'px';
+  tClone.style.top=(t.clientY-tClone.offsetHeight/2)+'px';
+  document.querySelectorAll('.zone').forEach(z=>{
+    const r=z.getBoundingClientRect();
+    if(t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom)z.classList.add('dragover');
+    else z.classList.remove('dragover');
+  });
+},{passive:true});
+mc.addEventListener('touchend',e=>{
+  if(!tClone)return;
+  const t=e.changedTouches[0];
+  document.querySelectorAll('.zone').forEach(z=>z.classList.remove('dragover'));
+  let placed=false;
+  document.querySelectorAll('.zone').forEach(z=>{
+    const r=z.getBoundingClientRect();
+    if(t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom){
+      placed=true;tClone.remove();tClone=null;mc.style.opacity='1';placeCard(parseInt(z.dataset.cat));
     }
+  });
+  if(!placed){tClone.remove();tClone=null;mc.style.opacity='1';}
+},{passive:true});
 
-    const data = await response.json();
-    let text = data.content.map(b => b.text || '').join('');
-    text = text.replace(/```json|```/g, '').trim();
-    const schools = JSON.parse(text);
+// ── KEYBOARD ─────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('sorting').classList.contains('active'))return;
+  if(['1','2','3','4','5'].includes(e.key))placeCard(parseInt(e.key));
+});
 
-    return res.status(200).json({ schools });
+// ── LOADING — 10 second story ────────────────────────────────
+function finishSorting(){
+  showScreen('loading');
+  const steps=['ls1','ls2','ls3','ls4','ls5','ls6','ls7','ls8'];
+  steps.forEach((id,i)=>setTimeout(()=>document.getElementById(id).classList.add('done'),(i*1100)+400));
+  setTimeout(callBackend,2000);
+}
 
-  } catch (error) {
-    console.error('Backend error:', error);
-    return res.status(500).json({ error: error.message });
+// ── AI BACKEND CALL ───────────────────────────────────────────
+async function callBackend(){
+  const must=[],like=[],neutral=[],prefNot=[],dontLike=[];
+  cards.forEach((c,i)=>{
+    const cat=placements[i];
+    if(cat===5)must.push(c.name);
+    else if(cat===4)like.push(c.name);
+    else if(cat===3)neutral.push(c.name);
+    else if(cat===2)prefNot.push(c.name);
+    else if(cat===1)dontLike.push(c.name);
+  });
+  try{
+    const res=await fetch('/api/match',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        mustHave:must,
+        wouldLike:like,
+        dontCare:neutral,
+        preferNot:prefNot,
+        dontLike:dontLike,
+        studentProfile:intakeData
+      })
+    });
+    if(!res.ok)throw new Error(`Server error: ${res.status}`);
+    const data=await res.json();
+    showResults(data.schools,must,like);
+  }catch(err){
+    showResults(null,[],[],err.toString());
   }
 }
+
+// ── RESULTS ──────────────────────────────────────────────────
+function showResults(schools,must,like,error){
+  showScreen('results');
+  const colors=['#2a9d5c','#2d5be3','#9a9590','#e07b2a','#c8453a'];
+  const labels=['Must Have','Would Like This','Doesn\'t Matter','Would Rather Not','Not For Me'];
+  document.getElementById('sumStrip').innerHTML=[5,4,3,2,1].map((cat,i)=>`
+    <div class="sum-item">
+      <div class="sum-num" style="color:${colors[i]}">${counts[cat]}</div>
+      <div class="sum-lbl">${labels[i]}</div>
+    </div>`).join('');
+  document.getElementById('pills').innerHTML=[
+    ...must.slice(0,10).map(p=>`<div class="pill pill-must">★ ${p}</div>`),
+    ...like.slice(0,8).map(p=>`<div class="pill pill-like">↑ ${p}</div>`)
+  ].join('');
+  const list=document.getElementById('schoolsList');
+  if(error||!schools){
+    list.innerHTML=`<div class="err-box"><strong>Could not load AI recommendations.</strong><br>Please ensure your API key is configured in Vercel environment variables.<br><br><small style="opacity:.55">${error||'Unknown error'}</small></div>`;
+    return;
+  }
+  const fitColor=pct=>pct>=80?'#2a9d5c':pct>=65?'#2d5be3':pct>=50?'#e07b2a':'#c8453a';
+  list.innerHTML=schools.map((s,i)=>`
+    <div class="s-card">
+      <div class="s-bar-wrap"><div class="s-bar" style="width:0%;background:${fitColor(s.fitPercent)}" data-pct="${s.fitPercent}"></div></div>
+      <div class="s-inner">
+        <div class="s-rank">${String(i+1).padStart(2,'0')}</div>
+        <div class="s-info">
+          <div class="s-name">${s.name}</div>
+          <div class="s-loc">📍 ${s.location}</div>
+          <div class="s-tags">${(s.tags||[]).map(t=>`<span class="s-tag">${t}</span>`).join('')}</div>
+        </div>
+        <div class="s-pct">
+          <div class="s-pct-num" style="color:${fitColor(s.fitPercent)}">${s.fitPercent}%</div>
+          <div class="s-pct-lbl">FIT SCORE</div>
+        </div>
+      </div>
+      <div class="s-why">${s.why}</div>
+    </div>`).join('');
+  requestAnimationFrame(()=>setTimeout(()=>
+    document.querySelectorAll('.s-bar').forEach(b=>b.style.width=b.dataset.pct+'%'),120));
+}
+
+// ── SHARE ────────────────────────────────────────────────────
+function shareResults(){
+  const text='I just found my college matches with College 360! Try it yourself:';
+  const url=window.location.href;
+  if(navigator.share){
+    navigator.share({title:'My College 360 Matches',text,url}).catch(()=>{});
+  } else {
+    navigator.clipboard.writeText(url).then(()=>showToast('Link copied to clipboard!')).catch(()=>{});
+  }
+}
+
+// ── RETAKE ───────────────────────────────────────────────────
+function retakeSort(){
+  counts={1:0,2:0,3:0,4:0,5:0};
+  placements={};idx=0;toastShown=false;
+  cards=[...ALL_CARDS].sort(()=>Math.random()-.5);
+  document.querySelectorAll('.load-step').forEach(s=>s.classList.remove('done'));
+  showScreen('sorting');
+  renderCard();
+}
+
+// ── RESET ────────────────────────────────────────────────────
+function resetApp(){
+  counts={1:0,2:0,3:0,4:0,5:0};
+  placements={};idx=0;toastShown=false;
+  intakeData={location:'',gpa:'',testType:'',testScore:'',budget:'',major:'',grade:''};
+  cards=[...ALL_CARDS].sort(()=>Math.random()-.5);
+  document.querySelectorAll('.load-step').forEach(s=>s.classList.remove('done'));
+  document.getElementById('q1').value='';
+  document.getElementById('q2').value='';
+  document.getElementById('q3-type').value='';
+  document.getElementById('q3-score').value='';
+  document.getElementById('q3-score').style.display='none';
+  document.getElementById('q4').value='';
+  document.getElementById('q5').value='';
+  document.querySelectorAll('#q6group .intake-btn').forEach(b=>b.classList.remove('selected'));
+  showScreen('splash');
+}
+
+init();
+</script>
+</body>
+</html>
