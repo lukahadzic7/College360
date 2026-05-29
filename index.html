@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>College 360</title>
+<title>Next4</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -196,7 +196,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 <!-- SPLASH -->
 <div id="splash" class="screen active">
   <div class="splash-inner">
-    <div class="splash-logo">College<span>360</span></div>
+    <div class="splash-logo">Next<span>4</span></div>
     <div class="splash-tagline">Find Your Perfect Match</div>
     <div class="splash-sub2">What are you really looking for?</div>
     <p class="splash-desc">Sort through topics that matter to you — your values, lifestyle, and goals. Our AI matches you with colleges that fit your life, not just your grades.</p>
@@ -208,7 +208,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 <!-- INTAKE FORM -->
 <div id="intake" class="screen">
   <div class="intake-inner">
-    <div class="intake-logo">College<span>360</span></div>
+    <div class="intake-logo">Next<span>4</span></div>
     <div class="intake-progress">
       <div class="intake-pip active"></div>
       <div class="intake-pip active"></div>
@@ -358,7 +358,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 <!-- SORTING -->
 <div id="sorting" class="screen">
   <div class="top-bar">
-    <div class="top-logo">College<span>360</span></div>
+    <div class="top-logo">Next<span>4</span></div>
     <div class="progress-wrap">
       <div class="progress-bar"><div class="progress-fill" id="pFill" style="width:0%"></div></div>
       <div class="progress-label" id="pLabel">0 / 0</div>
@@ -434,7 +434,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 <div id="results" class="screen">
   <div class="res-header">
     <div class="res-title">Your Top<br><span>College Matches</span></div>
-    <div class="res-sub">Based on your College 360 Profile</div>
+    <div class="res-sub">Based on your Next4 Profile</div>
   </div>
   <div class="res-body">
     <div class="sum-strip" id="sumStrip"></div>
@@ -924,10 +924,10 @@ function showResults(schools,must,like,error){
 
 // ── SHARE ────────────────────────────────────────────────────
 function shareResults(){
-  const text='I just found my college matches with College 360! Try it yourself:';
+  const text='I just found my college matches with Next4! Try it yourself:';
   const url=window.location.href;
   if(navigator.share){
-    navigator.share({title:'My College 360 Matches',text,url}).catch(()=>{});
+    navigator.share({title:'My Next4 Matches',text,url}).catch(()=>{});
   } else {
     navigator.clipboard.writeText(url).then(()=>showToast('Link copied to clipboard!')).catch(()=>{});
   }
