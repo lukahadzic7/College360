@@ -177,6 +177,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .btn-share{flex:1;min-width:150px;padding:16px 20px;border-radius:8px;border:2px solid var(--c5);background:var(--c5);color:#fff;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;cursor:pointer;transition:all .2s}
 .btn-share:hover{background:#228a4a;border-color:#228a4a}
 .disclaimer{font-size:11px;color:var(--muted);line-height:1.6;margin-top:28px;padding:14px 18px;background:rgba(0,0,0,.03);border-radius:8px;border:1px solid var(--rule);text-align:center}
+
+/* ── SHARE CARD OVERLAY ── */
+#shareOverlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:10000;display:none;align-items:center;justify-content:center;padding:20px}
+#shareOverlay.active{display:flex}
+.share-card{background:#1a1814;border-radius:24px;padding:28px 24px 24px;max-width:370px;width:100%;position:relative}
+.share-card-title{font-family:'Bebas Neue',sans-serif;font-size:30px;color:#fff;line-height:1;margin-bottom:18px;text-align:center}
+.share-card-title span{color:var(--c1)}
+.share-top5{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.share-row{display:flex;align-items:center;gap:12px;padding:11px 14px;background:rgba(255,255,255,.06);border-radius:12px;border:1px solid rgba(255,255,255,.08)}
+.share-rank{font-family:'Bebas Neue',sans-serif;font-size:24px;color:rgba(255,255,255,.2);min-width:26px;line-height:1}
+.share-info{flex:1}
+.share-name{font-family:'Bebas Neue',sans-serif;font-size:15px;color:#fff;line-height:1.1}
+.share-loc{font-size:11px;color:rgba(255,255,255,.35);margin-top:2px}
+.share-pct{font-family:'Bebas Neue',sans-serif;font-size:24px;line-height:1}
+.share-brand{text-align:center;margin-bottom:16px}
+.share-brand-sub{font-size:11px;color:rgba(255,255,255,.3);margin-bottom:4px}
+.share-brand-name{font-family:'Bebas Neue',sans-serif;font-size:20px;color:#fff;letter-spacing:1px}
+.share-brand-name span{color:var(--c1)}
+.share-btn-go{width:100%;padding:14px;border-radius:8px;border:none;background:var(--c1);color:#fff;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer;transition:all .2s}
+.share-btn-go:hover{background:#b03830}
+.share-close{position:absolute;top:14px;right:16px;background:none;border:none;color:rgba(255,255,255,.35);font-size:22px;cursor:pointer;line-height:1;padding:4px}
+.share-close:hover{color:#fff}
+
 .err-box{background:rgba(200,69,58,.08);border:1.5px solid rgba(200,69,58,.3);border-radius:12px;padding:20px 24px;color:var(--c1);font-size:14px;line-height:1.7;margin-top:20px}
 @media(max-width:480px){
   .zones-row{gap:5px}
@@ -272,10 +295,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
         <select class="intake-input" id="q4">
           <option value="" disabled selected>Select your range</option>
           <option value="under-15k">Under $15,000 / year</option>
-          <option value="15k-30k">$15,000 &ndash; $30,000 / year</option>
-          <option value="30k-50k">$30,000 &ndash; $50,000 / year</option>
-          <option value="50k-70k">$50,000 &ndash; $70,000 / year</option>
-          <option value="70k-plus">$70,000+ / year (no real limit)</option>
+          <option value="15k-30k">Up to $30,000 / year</option>
+          <option value="30k-50k">Up to $50,000 / year</option>
+          <option value="50k-70k">Up to $70,000 / year</option>
+          <option value="70k-plus">$70,000+ / year</option>
           <option value="need-aid">I'll need significant financial aid regardless</option>
           <option value="not-sure">Not sure yet</option>
         </select>
@@ -884,6 +907,7 @@ async function callBackend(){
 // ── RESULTS ──────────────────────────────────────────────────
 function showResults(schools,must,like,error){
   showScreen('results');
+  _sharedSchools=schools||[];
   const colors=['#2a9d5c','#2d5be3','#9a9590','#e07b2a','#c8453a'];
   const labels=['Must Have','Would Like This','Doesn\'t Matter','Would Rather Not','Not For Me'];
   document.getElementById('sumStrip').innerHTML=[5,4,3,2,1].map((cat,i)=>`
@@ -923,13 +947,40 @@ function showResults(schools,must,like,error){
 }
 
 // ── SHARE ────────────────────────────────────────────────────
+let _sharedSchools=[];
+
 function shareResults(){
-  const text='I just found my college matches with Next4! Try it yourself:';
+  // Build top 5 list
+  const top5=(_sharedSchools||[]).slice(0,5);
+  const fitColor=pct=>pct>=80?'#2a9d5c':pct>=65?'#2d5be3':pct>=50?'#e07b2a':'#c8453a';
+  document.getElementById('shareTop5').innerHTML=top5.map((s,i)=>`
+    <div class="share-row">
+      <div class="share-rank">${String(i+1).padStart(2,'0')}</div>
+      <div class="share-info">
+        <div class="share-name">${s.name}</div>
+        <div class="share-loc">${s.location}</div>
+      </div>
+      <div class="share-pct" style="color:${fitColor(s.fitPercent)}">${s.fitPercent}%</div>
+    </div>`).join('');
+  document.getElementById('shareOverlay').classList.add('active');
+}
+
+function closeShareCard(){
+  document.getElementById('shareOverlay').classList.remove('active');
+}
+
+function copyShareLink(){
   const url=window.location.href;
+  navigator.clipboard.writeText(url).then(()=>{showToast('Link copied!');closeShareCard();}).catch(()=>{});
+}
+
+function nativeShare(){
+  const url=window.location.href;
+  const text='I just found my top college matches with Next4! Try it yourself:';
   if(navigator.share){
-    navigator.share({title:'My Next4 Matches',text,url}).catch(()=>{});
+    navigator.share({title:'My Next4 Top 5',text,url}).catch(()=>{});
   } else {
-    navigator.clipboard.writeText(url).then(()=>showToast('Link copied to clipboard!')).catch(()=>{});
+    copyShareLink();
   }
 }
 
@@ -963,5 +1014,20 @@ function resetApp(){
 
 init();
 </script>
+
+<!-- SHARE OVERLAY -->
+<div id="shareOverlay">
+  <div class="share-card">
+    <button class="share-close" onclick="closeShareCard()">✕</button>
+    <div class="share-card-title">My Top <span>5</span><br>College Matches</div>
+    <div class="share-top5" id="shareTop5"></div>
+    <div class="share-brand">
+      <div class="share-brand-sub">find your matches at</div>
+      <div class="share-brand-name">Next<span>4</span></div>
+    </div>
+    <button class="share-btn-go" onclick="nativeShare()">SHARE ↗</button>
+  </div>
+</div>
+
 </body>
 </html>
