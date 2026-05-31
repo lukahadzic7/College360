@@ -21,7 +21,7 @@ STUDENT PROFILE (use this to calibrate every recommendation):
 - Intended major: ${p.major || 'Not specified'}
 - Grade level: ${p.grade || 'Not specified'}`;
 
-    const prompt = `You are an expert college counselor with encyclopedic, fact-based knowledge of US colleges and universities. A student has completed the College 360 preference card sort. Your job is to recommend their top 8 best-fit colleges with extreme precision and accuracy.
+    const prompt = `You are an expert college counselor with encyclopedic, fact-based knowledge of US colleges and universities. A student has completed the Next4 preference card sort. Your job is to recommend their top 8 best-fit colleges with extreme precision and accuracy.
 
 ${profileContext}
 
@@ -110,6 +110,9 @@ ACADEMIC FLEXIBILITY (in Learning Environment):
 - Senior Thesis or Capstone Required: schools requiring substantial final projects
 
 WEATHER: If Snow is Not For Me, never recommend schools in MN, WI, VT, ME, NH, ND, SD, MI, upstate NY. If Warm Weather is Must Have, only schools in FL, TX, AZ, CA, HI.
+
+QUALITY-WEIGHTING RULE (apply to all Must Have and Would Like This cards):
+When a student marks a card as "Must Have" or "Would Like This," do not simply confirm the school HAS that feature — weight toward schools that are genuinely EXCEPTIONAL or nationally recognized for it. For example, if "Community Service" is a Must Have, prioritize schools famous for service-learning (e.g. Tulane, Berea). If "Clubs" is a Must Have, prioritize schools with extraordinary student organization ecosystems. If "Research Opportunities" is a Must Have, prioritize schools with strong undergraduate research funding and output. The strength of the preference should map to the strength/reputation of that feature at the recommended school, not just its existence.
 
 FIT SCORING:
 - 90-97%: matches profile (GPA/budget/major) AND nearly all card must-haves
