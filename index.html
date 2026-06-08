@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+successfully downloaded text file (SHA: 4e34fddcc53f14b6db24770fc07e080e05ce4460)<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -546,7 +546,7 @@ function startSorting() {
 // Draft 5 — Fully audited card deck (162 cards total)
 const ALL_CARDS=[
   // FIELDS OF STUDY (49 — added Veterinary Science / Pre-Vet, renamed Liberal Arts)
-  {name:"Sports Medicine & Kinesiology",cat:"Fields of Study"},
+  {name:"Sports Medicine & Kinesiology",cat:"Fields of Study",note:"Human movement and athletic health; leads to PT, athletic training"},
   {name:"International Relations",cat:"Fields of Study"},
   {name:"Engineering",cat:"Fields of Study"},
   {name:"Fashion Design",cat:"Fields of Study"},
@@ -592,7 +592,7 @@ const ALL_CARDS=[
   {name:"Global Studies",cat:"Fields of Study"},
   {name:"Art",cat:"Fields of Study"},
   {name:"Architecture",cat:"Fields of Study"},
-  {name:"Pre-Law",cat:"Fields of Study"},
+  {name:"Pre-Law",cat:"Fields of Study",note:"A track for students planning law school, not a degree itself"},
   {name:"Pre-Med / Health Sciences",cat:"Fields of Study"},
   {name:"Graphic Design / UX Design",cat:"Fields of Study"},
   {name:"Veterinary Science / Pre-Vet",cat:"Fields of Study",note:"Animal medicine & veterinary career path"},
@@ -614,7 +614,7 @@ const ALL_CARDS=[
   {name:"Near Major Airport",cat:"Campus & Setting",note:"Within 30 minutes of a major airport"},
   {name:"Mountain Access",cat:"Campus & Setting",note:"Skiing, hiking & climbing nearby"},
   {name:"Beach Access",cat:"Campus & Setting",note:"Surfing, swimming & coastal life"},
-  {name:"Modern Facilities",cat:"Campus & Setting",note:"New labs, classrooms & academic buildings"},
+  {name:"State-of-the-Art Labs & Facilities",cat:"Campus & Setting",note:"Modern, well-funded labs and facilities for your field"},
   {name:"Far From Home",cat:"Campus & Setting"},
   {name:"Close to Home",cat:"Campus & Setting"},
   {name:"College Town",cat:"Campus & Setting",note:"Town centered around campus life"},
@@ -624,40 +624,35 @@ const ALL_CARDS=[
   {name:"Great Dorms",cat:"Campus & Setting"},
   {name:"Snow",cat:"Campus & Setting"},
   {name:"Warm Weather",cat:"Campus & Setting"},
-  {name:"Residential Campus",cat:"Campus & Setting",note:"Most students live on campus all 4 years"},
-  {name:"Campus Safety",cat:"Campus & Setting",note:"Low crime rates & strong security presence"},
+  {name:"Residential Campus",cat:"Campus & Setting",note:"Most students live on campus all 4 years, active nights and weekends"},
   {name:"Public Transportation Access",cat:"Campus & Setting",note:"Easy access to buses, trains, or metro"},
   {name:"Small College",cat:"Campus & Setting"},
   {name:"Medium Sized College",cat:"Campus & Setting"},
   {name:"Large College",cat:"Campus & Setting"},
 
   // ACTIVITIES & INVOLVEMENT (11 — added Required Internships, renamed Cultural Events)
-  {name:"Good Gym / Rec Center",cat:"Activities & Involvement"},
   {name:"Cultural Events",cat:"Activities & Involvement",note:"Concerts, art shows, lectures, festivals"},
   {name:"Community Service",cat:"Activities & Involvement"},
-  {name:"Clubs",cat:"Activities & Involvement"},
   {name:"Varsity Sports",cat:"Activities & Involvement",note:"NCAA or NAIA college teams"},
-  {name:"Intramural Sports",cat:"Activities & Involvement",note:"Recreational sports leagues for all students"},
-  {name:"Research Opportunities",cat:"Activities & Involvement",note:"Work alongside professors on original research"},
-  {name:"Required Internships",cat:"Activities & Involvement",note:"Internships built into the curriculum"},
-  {name:"ROTC",cat:"Activities & Involvement",note:"Military officer training program on campus"},
+  {name:"Intramural Sports",cat:"Activities & Involvement",note:"Casual sports leagues against students at your own school"},
+  {name:"Research Opportunities",cat:"Activities & Involvement",note:"Hands-on research with professors as an undergrad, not just reading"},
+  {name:"Internships Built Into Your Major",cat:"Activities & Involvement",note:"Internships are a required, built-in part of your major"},
+  {name:"ROTC",cat:"Activities & Involvement",note:"Train to become a military officer in college, often with full scholarships"},
   {name:"Study Abroad",cat:"Activities & Involvement",note:"Earn credits while studying in another country"},
 
   // RESOURCES & SUPPORT (17 — added 4 new, moved in ACT/SAT Optional and Gap Year Friendly)
   {name:"Tutoring",cat:"Resources & Support"},
-  {name:"Career Services & Job Placement",cat:"Resources & Support"},
-  {name:"Internship Programs",cat:"Resources & Support"},
+  {name:"Strong Internship Pipeline",cat:"Resources & Support",note:"Strong employer partnerships and support landing internships"},
   {name:"High Job Placement Rate",cat:"Resources & Support",note:"% of grads landing jobs after graduation"},
   {name:"On-Campus Recruiting / Career Fairs",cat:"Resources & Support",note:"Major employers actively recruiting on campus"},
-  {name:"Direct Admit to Major",cat:"Resources & Support",note:"Admitted straight into competitive majors"},
+  {name:"Direct Admit to Major",cat:"Resources & Support",note:"Accepted straight into your major, no re-applying later"},
   {name:"Community College Transfer Pathway",cat:"Resources & Support",note:"Articulation agreements with 4-year schools"},
   {name:"Dedicated Pre-Med Advising Office",cat:"Resources & Support",note:"Specialized advisors for pre-med students"},
   {name:"Honors College",cat:"Resources & Support",note:"Selective program with enhanced coursework"},
   {name:"Disability Support",cat:"Resources & Support",note:"Physical & learning disability services"},
   {name:"Financial Aid",cat:"Resources & Support"},
   {name:"Easy Access to Professors",cat:"Resources & Support"},
-  {name:"Mental Health Support",cat:"Resources & Support"},
-  {name:"Strong Alumni Network",cat:"Resources & Support",note:"Active graduates who help students with careers"},
+  {name:"Mental Health & Counseling Services",cat:"Resources & Support",note:"Strong counseling staff and short wait times for support"},
   {name:"Scholarships & Merit Aid",cat:"Resources & Support"},
   {name:"On-Campus Health Services",cat:"Resources & Support"},
   {name:"Athlete Recruitment",cat:"Resources & Support",note:"Being actively recruited to play a college sport"},
@@ -668,30 +663,27 @@ const ALL_CARDS=[
   {name:"Welcoming, Close-Knit Community",cat:"Campus Culture",note:"Students help each other, easy to make friends"},
   {name:"Party School",cat:"Campus Culture"},
   {name:"Outdoors Culture",cat:"Campus Culture"},
-  {name:"School Spirit",cat:"Campus Culture"},
   {name:"Liberal Campus",cat:"Campus Culture"},
   {name:"Social Justice Focus",cat:"Campus Culture"},
   {name:"Work Hard Play Hard",cat:"Campus Culture",note:"Intense academics + active social life"},
   {name:"Politically Aware",cat:"Campus Culture",note:"Active engagement in current events & politics"},
   {name:"Conservative Campus",cat:"Campus Culture"},
   {name:"Religious Campus",cat:"Campus Culture"},
-  {name:"Big Fish Small Pond",cat:"Campus Culture",note:"Stand out & lead on a smaller campus"},
   {name:"LGBTQ+ Friendly",cat:"Campus Culture"},
   {name:"Green / Eco Campus",cat:"Campus Culture"},
   {name:"Women Only",cat:"Campus Culture"},
   {name:"HBCU",cat:"Campus Culture",note:"Historically Black College or University"},
   {name:"Hispanic Serving Institution",cat:"Campus Culture",note:"50%+ Hispanic student enrollment"},
-  {name:"Diverse Campus",cat:"Campus Culture",note:"Racial, socioeconomic & geographic diversity"},
   {name:"Active International Student Community",cat:"Campus Culture",note:"Strong global student presence"},
   {name:"Creative Culture",cat:"Campus Culture"},
   {name:"Tech / Startup Culture",cat:"Campus Culture",note:"Innovation & entrepreneurship focused"},
   {name:"Strong Arts & Music Scene",cat:"Campus Culture",note:"Vibrant performing & visual arts community"},
   {name:"Greek Life",cat:"Campus Culture",note:"Sorority & fraternity community"},
   {name:"Good Food / Dining",cat:"Campus Culture"},
-  {name:"National Reputation",cat:"Campus Culture"},
+  {name:"National Reputation",cat:"Campus Culture",note:"A name employers and grad schools recognize nationwide"},
   {name:"First-Generation Student Friendly",cat:"Campus Culture",note:"First in family to attend college"},
   {name:"Veteran Friendly",cat:"Campus Culture"},
-  {name:"Low Cost of Living Area",cat:"Campus Culture",note:"Affordable city or town surrounding campus"},
+  {name:"Low Cost of Living Area",cat:"Campus Culture",note:"The town around campus is affordable for rent, food and daily life"},
 
   // LEARNING ENVIRONMENT (26 — moved 4 out, added 3 new, renamed 2)
   {name:"Learn by Discussion",cat:"Learning Environment",note:"Group conversations & seminars"},
@@ -704,14 +696,13 @@ const ALL_CARDS=[
   {name:"Large Classes",cat:"Learning Environment"},
   {name:"Structured Program",cat:"Learning Environment",note:"Clear required courses & set curriculum"},
   {name:"Unstructured Program",cat:"Learning Environment",note:"Design your own academic path"},
-  {name:"Scholarly Environment",cat:"Learning Environment",note:"Research-driven, academically focused culture"},
   {name:"Highly Rated Teaching Faculty",cat:"Learning Environment",note:"Professors known for excellent teaching"},
   {name:"Wide Range of Classes & Majors",cat:"Learning Environment"},
   {name:"Easy to Change Majors",cat:"Learning Environment",note:"Switch majors without falling behind"},
   {name:"Double Major Friendly",cat:"Learning Environment",note:"Logistically easy to pursue two majors"},
-  {name:"Senior Thesis or Capstone Required",cat:"Learning Environment",note:"In-depth final project to graduate"},
+  {name:"Senior Thesis or Capstone Required",cat:"Learning Environment",note:"A major final research project or creative work to graduate"},
   {name:"Accelerated Programs",cat:"Learning Environment",note:"Complete your degree in 3 years or less"},
-  {name:"Co-Op Programs",cat:"Learning Environment",note:"Alternating paid work semesters with school"},
+  {name:"Co-Op Programs",cat:"Learning Environment",note:"Alternate full semesters of paid work in your field with classes"},
   {name:"Apprenticeships, Trades & Certifications",cat:"Learning Environment",note:"Hands-on vocational & trade training"},
   {name:"Online / Hybrid Options",cat:"Learning Environment",note:"Mix of in-person and remote coursework"},
   {name:"Good Graduation Rate",cat:"Learning Environment",note:"High % of students finish their degree"},
@@ -926,7 +917,8 @@ function showResults(schools,must,like,error){
         <div class="s-info">
           <div class="s-name">${s.name}</div>
           <div class="s-loc">📍 ${s.location}</div>
-          <div class="s-tags">${(s.tags||[]).map(t=>`<span class="s-tag">${t}</span>`).join('')}</div>
+          ${s.admissibility?`<span class="s-adm" style="display:inline-block;margin-top:6px;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;color:#fff;background:${s.admissibility==='Likely'?'#2a9d5c':s.admissibility==='Reach'?'#c8453a':'#2d5be3'}">${s.admissibility.toUpperCase()}</span>`:''}
+          <div class="s-tags">${(Array.isArray(s.tags)?s.tags:(s.tags&&typeof s.tags==='object'?Object.values(s.tags):[])).filter(Boolean).map(t=>`<span class="s-tag">${t}</span>`).join('')}</div>
         </div>
         <div class="s-pct">
           <div class="s-pct-num" style="color:${fitColor(s.fitPercent)}">${s.fitPercent}%</div>
