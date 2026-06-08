@@ -132,7 +132,6 @@ CULTURE & IDENTITY (Campus Culture):
 - Religious Campus: only schools with active religious identity
 - LGBTQ+ Friendly: only schools with documented inclusive policies
 - Conservative Campus: only schools widely known for conservative student culture
-- Party School: only schools with documented party culture
 - Active International Student Community: only schools with 10%+ international enrollment
 - Tech / Startup Culture: e.g. Stanford, MIT, CMU, Georgia Tech, Northeastern
 - Strong Arts & Music Scene: schools with strong undergraduate arts presence
@@ -145,7 +144,6 @@ OUTCOMES (Resources & Support):
 - Internships Built Into Your Major: schools that require internships built into the major/curriculum for graduation (Northeastern, Drexel, Cincinnati, etc.)
 
 ACADEMIC FLEXIBILITY (Learning Environment):
-- Easy to Change Majors: schools known for flexible major switching
 - Double Major Friendly: schools where double majoring is logistically supported
 - Senior Thesis or Capstone Required: schools requiring substantial final projects
 
@@ -253,6 +251,11 @@ FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fa
     }
 
     schools = sanitizeSchools(schools);
+    // Replace the model's remembered figures with REAL College Scorecard data,
+    // and recompute admissibility from each school's actual SAT/ACT vs. this
+    // student. No-op (returns input unchanged) if SCORECARD_API_KEY is unset or
+    // the API is unreachable, so the endpoint never breaks.
+    schools = await enrichWithScorecard(schools, p, needsAid);
     return res.status(200).json({ schools });
 
   } catch (error) {
@@ -323,3 +326,162 @@ function sanitizeSchools(schools) {
 
   return cleaned;
 }
+
+// ============================================================================
+// COLLEGE SCORECARD VERIFICATION  (the "Option B" accuracy layer)
+// ----------------------------------------------------------------------------
+// The model picks the 8 schools, but its numbers come from training memory and
+// can be stale. This layer fetches REAL, current data from the U.S. Department
+// of Education's College Scorecard API for each picked school, then:
+//   1. overwrites the displayed cost / size / admit-rate tags with real figures
+//   2. recomputes Reach / Target / Likely from the school's actual SAT/ACT
+//      percentiles vs. THIS student's score (sub-20% admit = Reach for everyone)
+//
+// Requires env var SCORECARD_API_KEY (free at https://api.data.gov/signup).
+// If the key is missing or any lookup fails, the school keeps the model's
+// values, so results always render. Field reference:
+//   https://collegescorecard.ed.gov/data/documentation/
+//
+// NOTE FOR THE NATIVE APP: this is a clean, isolated function. A native backend
+// (no serverless timeout) could extend it to a two-pass design — feed these
+// verified numbers back to the model to drive SELECTION, not just display.
+// ============================================================================
+
+const SCORECARD_FIELDS = [
+  'school.name', 'school.city', 'school.state',
+  'latest.student.size',
+  'latest.admissions.admission_rate.overall',
+  'latest.admissions.sat_scores.25th_percentile.overall',
+  'latest.admissions.sat_scores.75th_percentile.overall',
+  'latest.admissions.act_scores.25th_percentile.cumulative',
+  'latest.admissions.act_scores.75th_percentile.cumulative',
+  'latest.cost.avg_net_price.public',
+  'latest.cost.avg_net_price.private',
+  'latest.cost.net_price.public.by_income_level.0-30000',
+  'latest.cost.net_price.private.by_income_level.0-30000',
+  'latest.completion.completion_rate_4yr_150nt',
+  'latest.student.retention_rate.four_year.full_time',
+  'latest.earnings.10_yrs_after_entry.median',
+].join(',');
+
+async function enrichWithScorecard(schools, profile, needsAid) {
+  const apiKey = process.env.SCORECARD_API_KEY;
+  if (!apiKey) return schools; // graceful fallback: no key -> model output as-is
+
+  const student = parseStudentTest(profile);
+
+  // Look up every school in parallel; one slow/failed lookup can't block others.
+  const results = await Promise.allSettled(
+    schools.map((s) => fetchScorecard(s, apiKey))
+  );
+
+  return schools.map((s, i) => {
+    const data = results[i].status === 'fulfilled' ? results[i].value : null;
+    if (!data) return s; // not found / error -> keep the model's values untouched
+
+    const size = data.size;
+    const sizeCat = size == null ? null
+      : size < 3000 ? 'Small' : size <= 15000 ? 'Medium' : 'Large';
+    const admitPct = data.admitRate != null ? Math.round(data.admitRate * 100) : null;
+    const net = pickNetPrice(data, needsAid);
+    const admissibility = classifyAdmissibility(student, data) || s.admissibility;
+
+    // Rebuild the self-labeled tag array with verified numbers. tags[2] (program
+    // strength) stays from the model — Scorecard has no program-quality metric.
+    const tags = [
+      net != null ? `${needsAid ? 'Est. net' : 'Net'} ~$${fmtK(net.value)}/yr${net.note}` : (s.tags[0] || ''),
+      sizeCat ? `${sizeCat} · ${size.toLocaleString()} ugrad` : (s.tags[1] || ''),
+      s.tags[2] || '',
+      admitPct != null ? `${admissibility} · ${admitPct}% admit` : `${admissibility}`,
+    ].filter(Boolean);
+
+    return { ...s, admissibility, tags, verified: true };
+  });
+}
+
+async function fetchScorecard(school, apiKey) {
+  const name = String(school.name || '').trim();
+  if (!name) return null;
+  const state = (String(school.location || '').split(',')[1] || '').trim();
+
+  const url = 'https://api.data.gov/ed/collegescorecard/v1/schools'
+    + `?api_key=${apiKey}`
+    + `&school.name=${encodeURIComponent(name)}`
+    + (state ? `&school.state=${encodeURIComponent(state)}` : '')
+    + `&fields=${SCORECARD_FIELDS}&per_page=10`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  let json;
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    if (!resp.ok) return null;
+    json = await resp.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const rows = (json && json.results) || [];
+  if (!rows.length) return null;
+  // Prefer an exact (case-insensitive) name match; otherwise take the first hit.
+  const lower = name.toLowerCase();
+  const row = rows.find((x) => String(x['school.name'] || '').toLowerCase() === lower) || rows[0];
+
+  return {
+    size: numOrNull(row['latest.student.size']),
+    admitRate: numOrNull(row['latest.admissions.admission_rate.overall']),
+    sat25: numOrNull(row['latest.admissions.sat_scores.25th_percentile.overall']),
+    sat75: numOrNull(row['latest.admissions.sat_scores.75th_percentile.overall']),
+    act25: numOrNull(row['latest.admissions.act_scores.25th_percentile.cumulative']),
+    act75: numOrNull(row['latest.admissions.act_scores.75th_percentile.cumulative']),
+    netAvgPublic: numOrNull(row['latest.cost.avg_net_price.public']),
+    netAvgPrivate: numOrNull(row['latest.cost.avg_net_price.private']),
+    netLowPublic: numOrNull(row['latest.cost.net_price.public.by_income_level.0-30000']),
+    netLowPrivate: numOrNull(row['latest.cost.net_price.private.by_income_level.0-30000']),
+    gradRate: numOrNull(row['latest.completion.completion_rate_4yr_150nt']),
+    retention: numOrNull(row['latest.student.retention_rate.four_year.full_time']),
+    earnings: numOrNull(row['latest.earnings.10_yrs_after_entry.median']),
+  };
+}
+
+// Parse the student's standardized test into { kind: 'SAT'|'ACT', score } or null.
+function parseStudentTest(profile) {
+  const type = String((profile && profile.testType) || '').toUpperCase();
+  const score = parseInt(String((profile && profile.testScore) || '').replace(/[^0-9]/g, ''), 10);
+  if (Number.isNaN(score)) return null;
+  if (type.includes('SAT')) return { kind: 'SAT', score };
+  if (type.includes('ACT')) return { kind: 'ACT', score };
+  if (score >= 400) return { kind: 'SAT', score }; // infer from magnitude
+  if (score >= 1 && score <= 36) return { kind: 'ACT', score };
+  return null;
+}
+
+// Reach / Target / Likely from REAL school data + this student's test score.
+function classifyAdmissibility(student, d) {
+  if (d.admitRate != null && d.admitRate < 0.20) return 'Reach'; // sub-20% = Reach for all
+  if (!student) return null;                                     // no score -> keep model's label
+  const p25 = student.kind === 'SAT' ? d.sat25 : d.act25;
+  const p75 = student.kind === 'SAT' ? d.sat75 : d.act75;
+  if (p25 == null || p75 == null) return null;                   // no test data -> keep model's
+  if (student.score >= p75) return 'Likely';
+  if (student.score >= p25) return 'Target';
+  return 'Reach';
+}
+
+// Choose the most relevant net price + a short clarifying note.
+// (With a real income input we could pick the exact bracket; absent that, we use
+// the lowest-income bracket as the aid estimate, else the school's average.)
+function pickNetPrice(d, needsAid) {
+  if (needsAid) {
+    const low = d.netLowPublic != null ? d.netLowPublic : d.netLowPrivate;
+    if (low != null) return { value: low, note: ' (lower-income est.)' };
+  }
+  const avg = d.netAvgPublic != null ? d.netAvgPublic : d.netAvgPrivate;
+  if (avg != null) return { value: avg, note: ' (avg)' };
+  return null;
+}
+
+function numOrNull(v) { return (v === null || v === undefined || v === '') ? null : Number(v); }
+function fmtK(n) { return Math.round(n / 1000) + 'K'; }
