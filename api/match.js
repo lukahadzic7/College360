@@ -151,7 +151,8 @@ ACADEMIC FLEXIBILITY (Learning Environment):
 
 SPECIALIZED CARD DATA RULES (newer cards - anchor each to a real source; if unverifiable, hedge in the caveat and do not credit the school):
 - Mental Health & Counseling Services: prioritize documented counseling capacity (low student-to-counselor ratio, short wait times, on-staff clinicians); do not credit a school merely for having a counseling center.
-- Strong Internship Pipeline: prioritize documented internship participation + employer partnerships (NACE first-destination internship rates, co-op offices, named employer pipelines); distinct from internships built into the major.- State-of-the-Art Labs & Facilities: prioritize documented recent capital investment + high research/instructional expenditures in the STUDENT'S field (NSF HERD; recent construction); scope to their major, not generic "nice buildings".
+- Strong Internship Pipeline: prioritize documented internship participation + employer partnerships (NACE first-destination internship rates, co-op offices, named employer pipelines); distinct from internships built into the major.
+- State-of-the-Art Labs & Facilities: prioritize documented recent capital investment + high research/instructional expenditures in the STUDENT'S field (NSF HERD; recent construction); scope to their major, not generic "nice buildings".
 
 WEATHER: If Snow is Not For Me, never recommend schools in MN, WI, VT, ME, NH, ND, SD, MI, upstate NY. If Warm Weather is Must Have, only schools in FL, TX, AZ, CA, HI.
 
@@ -216,7 +217,7 @@ FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fa
       },
       body: JSON.stringify({
         model: 'claude-opus-4-5',
-        max_tokens: 3200,
+        max_tokens: 8000,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -230,14 +231,25 @@ FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fa
     let text = data.content.map(b => b.text || '').join('');
     text = text.replace(/```json|```/g, '').trim();
 
-    let schools;
-    try {
-      schools = JSON.parse(text);
-    } catch (parseErr) {
-      // Defensive recovery: pull the outermost JSON array if the model wrapped it in prose.
-      const m = text.match(/\[[\s\S]*\]/);
-      if (!m) throw new Error('Model did not return parseable JSON: ' + parseErr.message);
-      schools = JSON.parse(m[0]);
+    // Robustly parse the model's JSON. Models occasionally emit a trailing
+    // comma, wrap the array in prose, or add code fences. Try progressively
+    // more forgiving variants before giving up.
+    const stripTrailingCommas = (t) => t.replace(/,(\s*[}\]])/g, '$1');
+    const candidates = [];
+    const arrayMatch = text.match(/\[[\s\S]*\]/);
+    if (arrayMatch) candidates.push(arrayMatch[0]);
+    candidates.push(text);
+
+    let schools, parseErr;
+    for (const c of candidates) {
+      for (const variant of [c, stripTrailingCommas(c)]) {
+        try { schools = JSON.parse(variant); break; } catch (e) { parseErr = e; }
+      }
+      if (schools) break;
+    }
+    if (!schools) {
+      console.error('Unparseable model output (first 500 chars):', text.slice(0, 500));
+      throw new Error('Could not parse model JSON: ' + (parseErr && parseErr.message));
     }
 
     schools = sanitizeSchools(schools);
