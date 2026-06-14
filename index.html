@@ -61,6 +61,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .progress-wrap{display:flex;align-items:center;gap:10px}
 .progress-bar{width:140px;height:4px;background:var(--rule);border-radius:2px;overflow:hidden}
 .progress-fill{height:100%;background:var(--c1);border-radius:2px;transition:width .4s ease}
+.section-bar{display:flex;gap:4px;width:160px}
+.seg{flex:1;height:4px;border-radius:2px;background:var(--rule);transition:background .3s,opacity .3s}
+.skip-section{background:transparent;border:1.5px solid var(--rule);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 20px;border-radius:8px;cursor:pointer;transition:all .2s}
+.skip-section:hover{border-color:var(--muted)}
 .progress-label{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)}
 .card-stage{flex:1;display:flex;align-items:center;justify-content:center;width:100%;max-width:700px;position:relative;min-height:300px}
 .card-ghost{position:absolute;width:320px;border-radius:16px;background:var(--surface);border:2px solid var(--rule);box-shadow:0 2px 8px rgba(0,0,0,.06)}
@@ -239,6 +243,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
       <div class="intake-pip active"></div>
       <div class="intake-pip active"></div>
       <div class="intake-pip active"></div>
+      <div class="intake-pip active" id="pipIncome" style="display:none"></div>
     </div>
     <div class="intake-title">A Few Quick<br>Questions First</div>
     <div class="intake-sub">Your answers help us narrow down thousands of schools to the ones that genuinely fit you. Takes about a minute.</div>
@@ -292,7 +297,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 
       <div class="intake-q">
         <div class="intake-label">4. What yearly tuition range works for you?</div>
-        <select class="intake-input" id="q4">
+        <select class="intake-input" id="q4" onchange="handleBudget()">
           <option value="" disabled selected>Select your range</option>
           <option value="under-15k">Under $15,000 / year</option>
           <option value="15k-30k">Up to $30,000 / year</option>
@@ -334,12 +339,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
           <option>Film</option>
           <option>Foreign Language &amp; Linguistics</option>
           <option>Geology</option>
-          <option>Global Studies</option>
           <option>Graphic Design / UX Design</option>
           <option>History</option>
           <option>Hospitality Management</option>
           <option>International Relations</option>
-          <option>Liberal Arts (broad humanities focus)</option>
           <option>Math</option>
           <option>Military Studies</option>
           <option>Music</option>
@@ -350,10 +353,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
           <option>Political Science</option>
           <option>Pre-Law</option>
           <option>Pre-Med / Health Sciences</option>
-          <option>Product / Industrial Design</option>
           <option>Psychology</option>
           <option>Public Health</option>
-          <option>Social Entrepreneurship</option>
           <option>Sociology</option>
           <option>Sports Management</option>
           <option>Sports Medicine &amp; Kinesiology</option>
@@ -362,8 +363,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
         </select>
       </div>
 
+      <div class="intake-q" id="qIncomeWrap" style="display:none">
+        <div class="intake-label">6. What is your family's approximate annual household income?</div>
+        <select class="intake-input" id="qIncome">
+          <option value="" disabled selected>Select a range</option>
+          <option value="under-20k">Under $20,000</option>
+          <option value="20k-40k">$20,000 – $40,000</option>
+          <option value="40k-60k">$40,000 – $60,000</option>
+          <option value="60k-80k">$60,000 – $80,000</option>
+          <option value="80k-100k">$80,000 – $100,000</option>
+          <option value="100k-120k">$100,000 – $120,000</option>
+          <option value="120k-plus">$120,000+</option>
+          <option value="prefer-not">Prefer not to say</option>
+        </select>
+      </div>
+
       <div class="intake-q">
-        <div class="intake-label">6. What grade in high school are you?</div>
+        <div class="intake-label" id="gradeLabel">6. What grade in high school are you?</div>
         <div class="intake-btn-group" id="q6group">
           <button class="intake-btn" onclick="selectGrade(this,'Freshman')">Freshman</button>
           <button class="intake-btn" onclick="selectGrade(this,'Sophomore')">Sophomore</button>
@@ -383,8 +399,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
   <div class="top-bar">
     <div class="top-logo">Next<span>4</span></div>
     <div class="progress-wrap">
-      <div class="progress-bar"><div class="progress-fill" id="pFill" style="width:0%"></div></div>
-      <div class="progress-label" id="pLabel">0 / 0</div>
+      <div class="section-bar" id="sectionBar"><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
+      <div class="progress-label" id="pLabel">&nbsp;</div>
     </div>
   </div>
   <div class="card-stage" style="position:relative">
@@ -432,6 +448,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
       <div class="zone-cnt" id="cnt5">0 cards</div>
     </div>
   </div>
+  <div style="display:flex;justify-content:center;padding:0 0 18px"><button class="skip-section" id="skipBtn" onclick="skipSection()">None of these matter to me</button></div>
 </div>
 
 <!-- LOADING -->
@@ -461,7 +478,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
   </div>
   <div class="res-body">
     <div class="sum-strip" id="sumStrip"></div>
-    <div class="sec-label">Your Must-Haves & Top Priorities</div>
+    <div id="prioLine" style="font-family:'DM Mono',monospace;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px"></div>
+    <div class="sec-label">Your Must-Haves</div>
     <div class="pills" id="pills"></div>
     <div class="sec-label">Your Matched Schools</div>
     <div class="schools" id="schoolsList"></div>
@@ -530,12 +548,21 @@ function handleTestType() {
   intakeData.testType = type;
 }
 
+function handleBudget() {
+  const need = document.getElementById('q4').value === 'need-aid';
+  document.getElementById('qIncomeWrap').style.display = need ? 'flex' : 'none';
+  document.getElementById('pipIncome').style.display = need ? 'block' : 'none';
+  document.getElementById('gradeLabel').textContent = (need ? '7' : '6') + '. What grade in high school are you?';
+  if(!need) document.getElementById('qIncome').value = '';
+}
+
 function startSorting() {
   intakeData.location  = document.getElementById('q1').value || 'Not specified';
   intakeData.gpa       = document.getElementById('q2').value || 'Not specified';
   intakeData.testType  = document.getElementById('q3-type').value || 'Not specified';
   intakeData.testScore = document.getElementById('q3-score').value || 'N/A';
   intakeData.budget    = document.getElementById('q4').value || 'Not specified';
+  intakeData.income    = (document.getElementById('qIncome') && document.getElementById('qIncome').value) || '';
   intakeData.major     = document.getElementById('q5').value || 'Not specified';
   if (!intakeData.grade) intakeData.grade = 'Not specified';
   showScreen('sorting');
@@ -555,7 +582,7 @@ const ALL_CARDS=[
   {name:"Philosophy",cat:"Fields of Study"},
   {name:"Sports Management",cat:"Fields of Study"},
   {name:"Communications & Journalism",cat:"Fields of Study"},
-  {name:"Liberal Arts",cat:"Fields of Study",note:"Broad humanities focus across disciplines"},
+  {name:"Liberal Arts",cat:"Learning Environment",note:"Broad humanities focus across disciplines"},
   {name:"Psychology",cat:"Fields of Study"},
   {name:"Physics",cat:"Fields of Study"},
   {name:"Geology",cat:"Fields of Study",note:"Study of earth's rocks, minerals & history"},
@@ -587,48 +614,46 @@ const ALL_CARDS=[
   {name:"Agriculture & Sustainability",cat:"Fields of Study"},
   {name:"Ethnic & Cultural Studies",cat:"Fields of Study",note:"Race, ethnicity & cultural identity studies"},
   {name:"Military Studies",cat:"Fields of Study"},
-  {name:"Product / Industrial Design",cat:"Fields of Study"},
   {name:"Art",cat:"Fields of Study"},
   {name:"Architecture",cat:"Fields of Study"},
   {name:"Pre-Law",cat:"Fields of Study",note:"A track for students planning law school, not a degree itself"},
   {name:"Pre-Med / Health Sciences",cat:"Fields of Study"},
-  {name:"Graphic Design / UX Design",cat:"Fields of Study"},
+  {name:"Graphic Design / UX Design",cat:"Fields of Study",note:"Visual & digital (UX) design for apps, websites & products"},
   {name:"Veterinary Science / Pre-Vet",cat:"Fields of Study",note:"Animal medicine & veterinary career path"},
 
   // LOCATION (9 — unchanged)
-  {name:"Rocky Mountains (CO, ID, MT, UT, WY)",cat:"Location"},
-  {name:"International",cat:"Location"},
-  {name:"Southwest (AZ, NM, OK, TX)",cat:"Location"},
-  {name:"Great Lakes (MI, IL, IN, OH, WI)",cat:"Location"},
-  {name:"Southeast (AL, AR, FL, GA, KY, LA, MS, NC, SC, TN, VA, WV)",cat:"Location"},
-  {name:"Mid-Atlantic (DE, MD, NJ, NY, PA, DC)",cat:"Location"},
-  {name:"New England (CT, ME, MA, NH, RI, VT)",cat:"Location"},
-  {name:"Plains (IA, KS, MN, MO, NE, ND, SD)",cat:"Location"},
-  {name:"West Coast (AK, CA, HI, NV, OR, WA)",cat:"Location"},
+  {name:"Rocky Mountains",cat:"Location & Setting",note:"Colorado, Idaho, Montana, Utah, Wyoming"},
+  {name:"Southwest",cat:"Location & Setting",note:"Arizona, New Mexico, Oklahoma, Texas"},
+  {name:"Great Lakes",cat:"Location & Setting",note:"Michigan, Illinois, Indiana, Ohio, Wisconsin"},
+  {name:"Southeast",cat:"Location & Setting",note:"Alabama, Arkansas, Florida, Georgia, Kentucky, Louisiana, Mississippi, North & South Carolina, Tennessee, Virginia, West Virginia"},
+  {name:"Mid-Atlantic",cat:"Location & Setting",note:"Delaware, Maryland, New Jersey, New York, Pennsylvania, Washington DC"},
+  {name:"New England",cat:"Location & Setting",note:"Connecticut, Maine, Massachusetts, New Hampshire, Rhode Island, Vermont"},
+  {name:"Plains",cat:"Location & Setting",note:"Iowa, Kansas, Minnesota, Missouri, Nebraska, North & South Dakota"},
+  {name:"West Coast",cat:"Location & Setting",note:"Alaska, California, Hawaii, Nevada, Oregon, Washington"},
 
   // CAMPUS & SETTING (22 — removed Lots of Sunlight, added 3 new, renamed 2)
-  {name:"Mountain Access",cat:"Campus & Setting",note:"Skiing, hiking & climbing nearby"},
-  {name:"Beach Access",cat:"Campus & Setting",note:"Surfing, swimming & coastal life"},
-  {name:"State-of-the-Art Labs & Facilities",cat:"Campus & Setting",note:"Modern, well-funded labs and facilities for your field"},
-  {name:"Far From Home",cat:"Campus & Setting"},
-  {name:"Close to Home",cat:"Campus & Setting"},
-  {name:"College Town",cat:"Campus & Setting",note:"Town centered around campus life"},
-  {name:"Suburban Setting",cat:"Campus & Setting"},
-  {name:"Rural Setting",cat:"Campus & Setting"},
-  {name:"City Campus",cat:"Campus & Setting",note:"Campus integrated within a major city"},
-  {name:"Great Dorms",cat:"Campus & Setting"},
-  {name:"Snow",cat:"Campus & Setting"},
-  {name:"Warm Weather",cat:"Campus & Setting"},
-  {name:"Residential Campus",cat:"Campus & Setting",note:"Most students live on campus all 4 years, active nights and weekends"},
-  {name:"Small College",cat:"Campus & Setting"},
-  {name:"Medium Sized College",cat:"Campus & Setting"},
-  {name:"Large College",cat:"Campus & Setting"},
+  {name:"Mountain Access",cat:"Location & Setting",note:"Skiing, hiking & climbing nearby"},
+  {name:"Beach Access",cat:"Location & Setting",note:"Surfing, swimming & coastal life"},
+  {name:"State-of-the-Art Labs & Facilities",cat:"Location & Setting",note:"Modern, well-funded labs and facilities for your field"},
+  {name:"Far From Home",cat:"Location & Setting"},
+  {name:"Close to Home",cat:"Location & Setting"},
+  {name:"College Town",cat:"Location & Setting",note:"Town centered around campus life"},
+  {name:"Suburban Setting",cat:"Location & Setting"},
+  {name:"Rural Setting",cat:"Location & Setting"},
+  {name:"City Campus",cat:"Location & Setting",note:"Campus integrated within a major city"},
+  {name:"Great Dorms",cat:"Location & Setting"},
+  {name:"Snow",cat:"Location & Setting"},
+  {name:"Warm Weather",cat:"Location & Setting"},
+  {name:"Residential Campus",cat:"Location & Setting",note:"Most students live on campus the first 1-2 years"},
+  {name:"Small College",cat:"Location & Setting"},
+  {name:"Medium Sized College",cat:"Location & Setting"},
+  {name:"Large College",cat:"Location & Setting"},
 
   // ACTIVITIES & INVOLVEMENT (11 — added Required Internships, renamed Cultural Events)
-  {name:"Cultural Events",cat:"Activities & Involvement",note:"Concerts, art shows, lectures, festivals"},
+  {name:"Campus Events",cat:"Activities & Involvement",note:"Concerts, art shows, guest speakers & festivals"},
   {name:"Community Service",cat:"Activities & Involvement"},
   {name:"Varsity Sports",cat:"Activities & Involvement",note:"NCAA or NAIA college teams"},
-  {name:"Intramural Sports",cat:"Activities & Involvement",note:"Casual sports leagues against students at your own school"},
+  {name:"Intramural Sports",cat:"Activities & Involvement",note:"Casual sports leagues against other students at your own school"},
   {name:"Research Opportunities",cat:"Activities & Involvement",note:"Hands-on research with professors as an undergrad, not just reading"},
   {name:"Internships Built Into Your Major",cat:"Activities & Involvement",note:"Internships are a required, built-in part of your major"},
   {name:"ROTC",cat:"Activities & Involvement",note:"Train to become a military officer in college, often with full scholarships"},
@@ -639,12 +664,12 @@ const ALL_CARDS=[
   {name:"High Job Placement Rate",cat:"Resources & Support",note:"% of grads landing jobs after graduation"},
   {name:"On-Campus Recruiting / Career Fairs",cat:"Resources & Support",note:"Major employers actively recruiting on campus"},
   {name:"Direct Admit to Major",cat:"Resources & Support",note:"Accepted straight into your major, no re-applying later"},
-  {name:"Community College Transfer Pathway",cat:"Resources & Support",note:"Articulation agreements with 4-year schools"},
+  {name:"Community College Transfer Pathway",cat:"Resources & Support",note:"A clear, supported path to transfer in from a community college"},
   {name:"Honors College",cat:"Resources & Support",note:"Selective program with enhanced coursework"},
   {name:"Disability Support",cat:"Resources & Support",note:"Physical & learning disability services"},
-  {name:"Financial Aid",cat:"Resources & Support"},
-  {name:"Mental Health & Counseling Services",cat:"Resources & Support",note:"Strong counseling staff and short wait times for support"},
-  {name:"Scholarships & Merit Aid",cat:"Resources & Support"},
+  {name:"Financial Aid",cat:"Resources & Support",note:"Need-based help with college costs"},
+  {name:"Mental Health & Counseling Services",cat:"Resources & Support"},
+  {name:"Scholarships & Merit Aid",cat:"Resources & Support",note:"Awards for grades, talent, or achievement"},
   {name:"Athlete Recruitment",cat:"Resources & Support",note:"Being actively recruited to play a college sport"},
   {name:"ACT/SAT Optional",cat:"Resources & Support",note:"No standardized test score required"},
   {name:"Gap Year Friendly",cat:"Resources & Support",note:"Defer enrollment for a year after high school"},
@@ -655,23 +680,23 @@ const ALL_CARDS=[
   {name:"Social Justice Focus",cat:"Campus Culture"},
   {name:"Conservative Campus",cat:"Campus Culture"},
   {name:"Religious Campus",cat:"Campus Culture"},
-  {name:"LGBTQ+ Friendly",cat:"Campus Culture"},
+  {name:"LGBTQ+ Friendly",cat:"Identity & Community"},
   {name:"Green / Eco Campus",cat:"Campus Culture"},
-  {name:"Women Only",cat:"Campus Culture"},
-  {name:"HBCU",cat:"Campus Culture",note:"Historically Black College or University"},
-  {name:"Hispanic Serving Institution",cat:"Campus Culture",note:"50%+ Hispanic student enrollment"},
-  {name:"Active International Student Community",cat:"Campus Culture",note:"Strong global student presence"},
+  {name:"Women Only",cat:"Identity & Community"},
+  {name:"HBCU",cat:"Identity & Community",note:"Historically Black College or University"},
+  {name:"Hispanic Serving Institution",cat:"Identity & Community",note:"25%+ Hispanic student enrollment (federal designation)"},
+  {name:"Native American / Tribal College",cat:"Identity & Community",note:"Tribal colleges & Native American-serving institutions"},
+  {name:"Active International Student Community",cat:"Identity & Community",note:"Strong global student presence"},
   {name:"Tech / Startup Culture",cat:"Campus Culture",note:"Innovation & entrepreneurship focused"},
   {name:"Strong Arts & Music Scene",cat:"Campus Culture",note:"Vibrant performing & visual arts community"},
   {name:"Greek Life",cat:"Campus Culture",note:"Sorority & fraternity community"},
-  {name:"National Reputation",cat:"Campus Culture",note:"A name employers and grad schools recognize nationwide"},
-  {name:"First-Generation Student Friendly",cat:"Campus Culture",note:"First in family to attend college"},
-  {name:"Veteran Friendly",cat:"Campus Culture"},
-  {name:"Low Cost of Living Area",cat:"Campus Culture",note:"The town around campus is affordable for rent, food and daily life"},
+  {name:"National Reputation",cat:"Resources & Support",note:"A name employers and grad schools recognize nationwide"},
+  {name:"First-Generation Student Friendly",cat:"Identity & Community",note:"First in family to attend college"},
+  {name:"Veteran Friendly",cat:"Identity & Community"},
+  {name:"Low Cost of Living Area",cat:"Location & Setting",note:"The town around campus is affordable for rent, food and daily life"},
 
   // LEARNING ENVIRONMENT (26 — moved 4 out, added 3 new, renamed 2)
-  {name:"Learn by Discussion",cat:"Learning Environment",note:"Group conversations & seminars"},
-  {name:"Hands-On Learning",cat:"Learning Environment"},
+  {name:"Discussion-Based Classes",cat:"Learning Environment",note:"Group conversations & seminars"},
   {name:"Competitive Environment",cat:"Learning Environment"},
   {name:"Collaborative Environment",cat:"Learning Environment"},
   {name:"Small Classes",cat:"Learning Environment"},
@@ -683,16 +708,30 @@ const ALL_CARDS=[
   {name:"Senior Thesis or Capstone Required",cat:"Learning Environment",note:"A major final research project or creative work to graduate"},
   {name:"Accelerated Programs",cat:"Learning Environment",note:"Complete your degree in 3 years or less"},
   {name:"Co-Op Programs",cat:"Learning Environment",note:"Alternate full semesters of paid work in your field with classes"},
-  {name:"Apprenticeships, Trades & Certifications",cat:"Learning Environment",note:"Hands-on vocational & trade training"},
-  {name:"High Graduation Rate",cat:"Learning Environment",note:"High % of students finish their degree"},
+  {name:"Apprenticeships, Trades & Certifications",cat:"Learning Environment",note:"Hands-on training and certifications for skilled careers"},
+  {name:"High Graduation Rate",cat:"Resources & Support",note:"High % of students finish their degree"},
 ];
 
 // ── STATE ─────────────────────────────────────────────────────
 let cards=[],idx=0,placements={},counts={1:0,2:0,3:0,4:0,5:0};
 let toastTimer=null, toastShown=false;
 
+const SECTION_ORDER=["Fields of Study","Location & Setting","Resources & Support","Learning Environment","Campus Culture","Activities & Involvement","Identity & Community"];
+let sectionStart={}, sectionCount={};
+function buildDeck(){
+  const byCat={};
+  ALL_CARDS.forEach(c=>{(byCat[c.cat]=byCat[c.cat]||[]).push(c);});
+  const order=[...SECTION_ORDER, ...Object.keys(byCat).filter(c=>!SECTION_ORDER.includes(c))];
+  cards=[]; sectionStart={}; sectionCount={};
+  order.forEach(cat=>{
+    const grp=(byCat[cat]||[]).slice().sort(()=>Math.random()-.5);
+    sectionStart[cat]=cards.length; sectionCount[cat]=grp.length;
+    grp.forEach(c=>cards.push(c));
+  });
+}
+
 function init(){
-  cards=[...ALL_CARDS].sort(()=>Math.random()-.5);
+  buildDeck();
   document.getElementById('totalCount').textContent=`${cards.length} cards across 7 categories`;
 }
 
@@ -705,13 +744,6 @@ function showScreen(id){
 function renderCard(){
   if(idx>=cards.length){finishSorting();return;}
 
-  // 75% toast
-  if(!toastShown && idx>=Math.floor(cards.length*.75)){
-    toastShown=true;
-    const remaining=cards.length-idx;
-    showToast(`Almost there — ${remaining} cards left!`);
-  }
-
   const card=cards[idx];
   const el=document.getElementById('mainCard');
   document.getElementById('cardName').textContent=card.name;
@@ -721,14 +753,24 @@ function renderCard(){
   el.classList.remove('flying');
   el.classList.add('entering');
   setTimeout(()=>el.classList.remove('entering'),350);
-  const pct=Math.round((idx/cards.length)*100);
-  document.getElementById('pFill').style.width=pct+'%';
-  document.getElementById('pLabel').textContent=`${idx} / ${cards.length}`;
+  updateSectionProgress(card.cat);
   for(let i=1;i<=5;i++){
     const c=counts[i];
     document.getElementById('cnt'+i).textContent=c+(c===1?' card':' cards');
   }
   document.getElementById('undoBtn').disabled=(idx===0);
+}
+
+function updateSectionProgress(cat){
+  const secIdx=SECTION_ORDER.indexOf(cat);
+  const within=idx-(sectionStart[cat]||0)+1;
+  const total=sectionCount[cat]||0;
+  document.getElementById('pLabel').textContent=`${cat} · ${within} of ${total}`;
+  document.querySelectorAll('#sectionBar .seg').forEach((seg,i)=>{
+    if(i<secIdx){seg.style.background='var(--c1)';seg.style.opacity='1';}
+    else if(i===secIdx){seg.style.background='var(--c1)';seg.style.opacity='.5';}
+    else{seg.style.background='var(--rule)';seg.style.opacity='1';}
+  });
 }
 
 function showToast(msg){
@@ -759,6 +801,13 @@ function undoCard(){
   const prevCat=placements[idx];
   if(prevCat) counts[prevCat]=Math.max(0,counts[prevCat]-1);
   delete placements[idx];
+  renderCard();
+}
+
+function skipSection(){
+  if(idx>=cards.length)return;
+  const cat=cards[idx].cat;
+  while(idx<cards.length && cards[idx].cat===cat){ placements[idx]=3; counts[3]++; idx++; }
   renderCard();
 }
 
@@ -838,10 +887,11 @@ function finishSorting(){
 // ── AI BACKEND CALL ───────────────────────────────────────────
 async function callBackend(){
   const must=[],like=[],neutral=[],prefNot=[],dontLike=[];
+  const mustByCat={},likeByCat={};
   cards.forEach((c,i)=>{
     const cat=placements[i];
-    if(cat===5)must.push(c.name);
-    else if(cat===4)like.push(c.name);
+    if(cat===5){must.push(c.name);(mustByCat[c.cat]=mustByCat[c.cat]||[]).push(c.name);}
+    else if(cat===4){like.push(c.name);(likeByCat[c.cat]=likeByCat[c.cat]||[]).push(c.name);}
     else if(cat===3)neutral.push(c.name);
     else if(cat===2)prefNot.push(c.name);
     else if(cat===1)dontLike.push(c.name);
@@ -856,19 +906,25 @@ async function callBackend(){
         dontCare:neutral,
         preferNot:prefNot,
         dontLike:dontLike,
+        mustHaveByCategory:mustByCat,
+        wouldLikeByCategory:likeByCat,
         studentProfile:intakeData
       })
     });
     if(!res.ok)throw new Error(`Server error: ${res.status}`);
     const data=await res.json();
-    showResults(data.schools,must,like);
+    const dim={};
+    Object.entries(mustByCat).forEach(([c,a])=>dim[c]=(dim[c]||0)+a.length*2);
+    Object.entries(likeByCat).forEach(([c,a])=>dim[c]=(dim[c]||0)+a.length);
+    const topCats=Object.entries(dim).sort((a,b)=>b[1]-a[1]).slice(0,2).map(e=>e[0]);
+    showResults(data.schools,must,like,null,topCats);
   }catch(err){
     showResults(null,[],[],err.toString());
   }
 }
 
 // ── RESULTS ──────────────────────────────────────────────────
-function showResults(schools,must,like,error){
+function showResults(schools,must,like,error,topCats){
   showScreen('results');
   _sharedSchools=schools||[];
   const colors=['#2a9d5c','#2d5be3','#9a9590','#e07b2a','#c8453a'];
@@ -878,10 +934,9 @@ function showResults(schools,must,like,error){
       <div class="sum-num" style="color:${colors[i]}">${counts[cat]}</div>
       <div class="sum-lbl">${labels[i]}</div>
     </div>`).join('');
-  document.getElementById('pills').innerHTML=[
-    ...must.slice(0,10).map(p=>`<div class="pill pill-must">★ ${p}</div>`),
-    ...like.slice(0,8).map(p=>`<div class="pill pill-like">↑ ${p}</div>`)
-  ].join('');
+  const pl=document.getElementById('prioLine'); if(pl) pl.textContent=(topCats&&topCats.length)?('Your top priorities: '+topCats.join(' & ')):'';
+  document.getElementById('pills').innerHTML=
+    must.map(p=>`<div class="pill pill-must">★ ${p}</div>`).join('');
   const list=document.getElementById('schoolsList');
   if(error||!schools){
     list.innerHTML=`<div class="err-box"><strong>Could not load AI recommendations.</strong><br>Please ensure your API key is configured in Vercel environment variables.<br><br><small style="opacity:.55">${error||'Unknown error'}</small></div>`;
@@ -952,7 +1007,7 @@ function nativeShare(){
 function retakeSort(){
   counts={1:0,2:0,3:0,4:0,5:0};
   placements={};idx=0;toastShown=false;
-  cards=[...ALL_CARDS].sort(()=>Math.random()-.5);
+  buildDeck();
   document.querySelectorAll('.load-step').forEach(s=>s.classList.remove('done'));
   showScreen('sorting');
   renderCard();
@@ -962,8 +1017,8 @@ function retakeSort(){
 function resetApp(){
   counts={1:0,2:0,3:0,4:0,5:0};
   placements={};idx=0;toastShown=false;
-  intakeData={location:'',gpa:'',testType:'',testScore:'',budget:'',major:'',grade:''};
-  cards=[...ALL_CARDS].sort(()=>Math.random()-.5);
+  intakeData={location:'',gpa:'',testType:'',testScore:'',budget:'',major:'',grade:'',income:''};
+  buildDeck();
   document.querySelectorAll('.load-step').forEach(s=>s.classList.remove('done'));
   document.getElementById('q1').value='';
   document.getElementById('q2').value='';
@@ -971,6 +1026,10 @@ function resetApp(){
   document.getElementById('q3-score').value='';
   document.getElementById('q3-score').style.display='none';
   document.getElementById('q4').value='';
+  document.getElementById('qIncomeWrap').style.display='none';
+  document.getElementById('pipIncome').style.display='none';
+  document.getElementById('qIncome').value='';
+  document.getElementById('gradeLabel').textContent='6. What grade in high school are you?';
   document.getElementById('q5').value='';
   document.querySelectorAll('#q6group .intake-btn').forEach(b=>b.classList.remove('selected'));
   showScreen('splash');
