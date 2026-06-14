@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { mustHave, wouldLike, dontCare, preferNot, dontLike, studentProfile } = req.body;
+    const { mustHave, wouldLike, dontCare, preferNot, dontLike, studentProfile, mustHaveByCategory, wouldLikeByCategory } = req.body;
     const p = studentProfile || {};
 
     // Detect whether the student signaled a need for financial aid anywhere in
@@ -22,6 +22,28 @@ export default async function handler(req, res) {
       aidSignals.some(s => budgetStr.includes(s)) ||
       budgetStr.includes('under $15') || budgetStr.includes('significant');
 
+    // Summarize how the student's MUST HAVE + WOULD LIKE cards distribute across
+    // the 7 preference categories so the model can weight by DIMENSION, not just
+    // by individual card. MUST HAVE counts double. Empty if frontend didn't send it.
+    const dimCounts = {};
+    for (const [cat, names] of Object.entries(mustHaveByCategory || {})) {
+      dimCounts[cat] = (dimCounts[cat] || 0) + (Array.isArray(names) ? names.length : 0) * 2;
+    }
+    for (const [cat, names] of Object.entries(wouldLikeByCategory || {})) {
+      dimCounts[cat] = (dimCounts[cat] || 0) + (Array.isArray(names) ? names.length : 0);
+    }
+    const dimRows = Object.entries(dimCounts).sort((a, b) => b[1] - a[1]);
+    const dimensionSection = dimRows.length
+      ? "\nPRIORITY DIMENSIONS (how this student's MUST HAVE + WOULD LIKE cards spread across the 7 categories, ranked by weight; MUST HAVE counts double). Use this to see what matters MOST to this student and to balance the final list across their emphasized dimensions, not just isolated cards. If one or two dimensions dominate, weight schools that genuinely excel on those:\n"
+        + dimRows.map(([cat, w]) => `- ${cat} (weight ${w})`).join('\n') + '\n'
+      : '';
+
+    // Live cost-of-living reference (BEA state Regional Price Parities) — only
+    // fetched when the student actually cares about cost of living, to avoid
+    // latency on every sort. No-op if BEA_API_KEY is unset or the API is down.
+    const wantsLowCost = [...(mustHave || []), ...(wouldLike || [])].some(c => /low cost of living/i.test(String(c)));
+    const rppSection = wantsLowCost ? buildRppSection(await fetchStateRPP(process.env.BEA_API_KEY)) : '';
+
     const profileContext = `
 STUDENT PROFILE (use this to calibrate every recommendation):
 - Home state: ${p.location || 'Not specified'}
@@ -32,7 +54,7 @@ STUDENT PROFILE (use this to calibrate every recommendation):
 - Grade level: ${p.grade || 'Not specified'}
 - Financial-aid need detected: ${needsAid ? 'YES - evaluate affordability on NET price, not sticker price' : 'No explicit aid signal - use stated budget'}`;
 
-    const prompt = `You are an expert college counselor with encyclopedic, fact-based knowledge of US colleges and universities. A student has completed the Next4 preference card sort. Your job is to recommend their top 8 best-fit colleges with extreme precision and accuracy.
+    const prompt = `You are an expert college counselor with encyclopedic, fact-based knowledge of US colleges and universities. A student has completed the Next4 preference card sort. Your job is to recommend their top 10 best-fit colleges with extreme precision and accuracy.
 
 ${profileContext}
 
@@ -42,6 +64,7 @@ WOULD LIKE THIS (high priority - strongly weight these in scoring): ${(wouldLike
 DOESN'T MATTER (neutral): ${(dontCare || []).join(', ') || 'none'}
 WOULD RATHER NOT (negative weight - penalize schools with these traits): ${(preferNot || []).join(', ') || 'none'}
 NOT FOR ME (deal-breaker - automatically disqualify any school strongly associated with these): ${(dontLike || []).join(', ') || 'none'}
+${dimensionSection}${rppSection}
 
 ==================================================================
 DATA SOURCE ANCHORING - read first, applies to every number you output
@@ -127,7 +150,8 @@ SIZE:
 
 CULTURE & IDENTITY (Campus Culture):
 - HBCU: only officially designated Historically Black Colleges and Universities
-- Hispanic Serving Institution: only schools with official HSI federal designation
+- Hispanic Serving Institution: only schools with official HSI federal designation (25%+ Hispanic enrollment)
+- Native American / Tribal College: only federally recognized Tribal Colleges (TCUs) or Native American-serving institutions
 - Women Only: only actual women's colleges
 - Religious Campus: only schools with active religious identity
 - LGBTQ+ Friendly: only schools with documented inclusive policies
@@ -151,6 +175,7 @@ SPECIALIZED CARD DATA RULES (newer cards - anchor each to a real source; if unve
 - Mental Health & Counseling Services: prioritize documented counseling capacity (low student-to-counselor ratio, short wait times, on-staff clinicians); do not credit a school merely for having a counseling center.
 - Strong Internship Pipeline: prioritize documented internship participation + employer partnerships (NACE first-destination internship rates, co-op offices, named employer pipelines); distinct from internships built into the major.
 - State-of-the-Art Labs & Facilities: prioritize documented recent capital investment + high research/instructional expenditures in the STUDENT'S field (NSF HERD; recent construction); scope to their major, not generic "nice buildings".
+- Low Cost of Living Area: judge by the cost of living of the school's CITY/METRO (not its tuition), anchored to BEA Regional Price Parities (RPP) and HUD Fair Market Rents. "Low" = metro RPP below the national average (100) and below-median area rents. Do not credit a school in an expensive metro just because its tuition or net price is low.
 
 WEATHER: If Snow is Not For Me, never recommend schools in MN, WI, VT, ME, NH, ND, SD, MI, upstate NY. If Warm Weather is Must Have, only schools in FL, TX, AZ, CA, HI.
 
@@ -185,7 +210,7 @@ SCHOOL DIVERSITY: Include a mix of -
 OUTPUT FORMAT
 ==================================================================
 Return ONLY valid JSON - no markdown, no backticks, no preamble, no trailing commas.
-Return a JSON array of exactly 8 school objects, ordered by fitPercent descending. Each object:
+Return a JSON array of exactly 10 school objects, ordered by fitPercent descending. Each object:
 - "name": full official school name
 - "location": "City, ST" (e.g. "Ann Arbor, MI")
 - "fitPercent": honest integer 52-99
@@ -195,10 +220,10 @@ Return a JSON array of exactly 8 school objects, ordered by fitPercent descendin
     - "size": size category + approx undergrad enrollment (e.g. "Medium, ~9,400 ugrad")
     - "program": key program strength tied to the student's major/priorities (e.g. "Top-20 ABET Engineering")
     - "fit": admissibility label + admit-rate context (e.g. "Target, ~38% admit")
-- "why": exactly 2 sentences. Sentence 1: 2-3 specific, source-anchored facts connecting the school to this student's profile and cards. Sentence 2: one honest caveat (note data-confidence if any figure is approximate).
+- "why": exactly 2 sentences. Sentence 1: 2-3 specific, source-anchored facts connecting the school to this student's profile and cards. Sentence 2: one honest caveat (note data-confidence if any figure is approximate). Do NOT put precise admit rates, net prices, test scores, or enrollment counts in the "why" — those exact figures appear in the tags; refer to them qualitatively here (e.g., "highly selective", "affordable after aid", "large public").
 
 FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fails:
-1. Exactly 8 schools.
+1. Exactly 10 schools.
 2. Valid JSON: no markdown, no backticks, no trailing commas.
 3. Every object has name, location, fitPercent (integer 52-99), admissibility, tags{cost,size,program,fit}, and a 2-sentence why.
 4. At least 1 school is "Likely" and at least 1 is "Reach"; not all are "Reach".
@@ -206,55 +231,30 @@ FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fa
 6. Every MUST HAVE card is reflected in the recommended schools (schools that fail a MUST HAVE were excluded).
 7. Every numeric figure is source-anchored or explicitly hedged as approximate - no fabricated precise stats.`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-opus-4-5',
-        max_tokens: 8000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      return res.status(response.status).json({ error: errorData });
-    }
-
-    const data = await response.json();
-    let text = data.content.map(b => b.text || '').join('');
-    text = text.replace(/```json|```/g, '').trim();
-
-    // Robustly parse the model's JSON. Models occasionally emit a trailing
-    // comma, wrap the array in prose, or add code fences. Try progressively
-    // more forgiving variants before giving up.
-    const stripTrailingCommas = (t) => t.replace(/,(\s*[}\]])/g, '$1');
-    const candidates = [];
-    const arrayMatch = text.match(/\[[\s\S]*\]/);
-    if (arrayMatch) candidates.push(arrayMatch[0]);
-    candidates.push(text);
-
-    let schools, parseErr;
-    for (const c of candidates) {
-      for (const variant of [c, stripTrailingCommas(c)]) {
-        try { schools = JSON.parse(variant); break; } catch (e) { parseErr = e; }
+    // ── SCHOOL SELECTION ──────────────────────────────────────────────────
+    // Two-pass when Scorecard is available (data-driven shortlist): a fast model
+    // proposes candidates -> we attach REAL Scorecard data -> the strong model
+    // picks the final list FROM those verified numbers. Falls back to a single
+    // pass (the model's own picks) if Scorecard is off or pass 1 fails, so the
+    // endpoint never breaks.
+    let schools = null;
+    if (process.env.SCORECARD_API_KEY) {
+      try {
+        schools = await runTwoPass(apiKey, p, needsAid, prompt, {
+          mustHave, wouldLike, preferNot, dontLike, dimensionSection,
+        });
+      } catch (e) {
+        console.warn('Two-pass failed; falling back to single pass:', e && e.message);
+        schools = null;
       }
-      if (schools) break;
     }
     if (!schools) {
-      console.error('Unparseable model output (first 500 chars):', text.slice(0, 500));
-      throw new Error('Could not parse model JSON: ' + (parseErr && parseErr.message));
+      schools = await callClaudeForJson(apiKey, 'claude-opus-4-5', prompt, 8000);
     }
 
     schools = sanitizeSchools(schools);
-    // Replace the model's remembered figures with REAL College Scorecard data,
-    // and recompute admissibility from each school's actual SAT/ACT vs. this
-    // student. No-op (returns input unchanged) if SCORECARD_API_KEY is unset or
-    // the API is unreachable, so the endpoint never breaks.
+    // Final verification layer: replace any remembered figures with REAL
+    // Scorecard data and recompute admissibility. No-op if no key / API down.
     schools = await enrichWithScorecard(schools, p, needsAid);
     return res.status(200).json({ schools });
 
@@ -273,7 +273,7 @@ function sanitizeSchools(schools) {
     throw new Error('Model did not return a JSON array of schools');
   }
 
-  const cleaned = schools.slice(0, 8).map((s) => {
+  const cleaned = schools.slice(0, 10).map((s) => {
     const obj = (s && typeof s === 'object') ? s : {};
 
     let fit = parseInt(obj.fitPercent, 10);
@@ -358,7 +358,15 @@ const SCORECARD_FIELDS = [
   'latest.cost.avg_net_price.public',
   'latest.cost.avg_net_price.private',
   'latest.cost.net_price.public.by_income_level.0-30000',
+  'latest.cost.net_price.public.by_income_level.30001-48000',
+  'latest.cost.net_price.public.by_income_level.48001-75000',
+  'latest.cost.net_price.public.by_income_level.75001-110000',
+  'latest.cost.net_price.public.by_income_level.110001-plus',
   'latest.cost.net_price.private.by_income_level.0-30000',
+  'latest.cost.net_price.private.by_income_level.30001-48000',
+  'latest.cost.net_price.private.by_income_level.48001-75000',
+  'latest.cost.net_price.private.by_income_level.75001-110000',
+  'latest.cost.net_price.private.by_income_level.110001-plus',
   'latest.completion.completion_rate_4yr_150nt',
   'latest.student.retention_rate.four_year.full_time',
   'latest.earnings.10_yrs_after_entry.median',
@@ -383,7 +391,7 @@ async function enrichWithScorecard(schools, profile, needsAid) {
     const sizeCat = size == null ? null
       : size < 3000 ? 'Small' : size <= 15000 ? 'Medium' : 'Large';
     const admitPct = data.admitRate != null ? Math.round(data.admitRate * 100) : null;
-    const net = pickNetPrice(data, needsAid);
+    const net = pickNetPrice(data, needsAid, profile && profile.income);
     const admissibility = classifyAdmissibility(student, data) || s.admissibility;
 
     // Rebuild the self-labeled tag array with verified numbers. tags[2] (program
@@ -438,8 +446,20 @@ async function fetchScorecard(school, apiKey) {
     act75: numOrNull(row['latest.admissions.act_scores.75th_percentile.cumulative']),
     netAvgPublic: numOrNull(row['latest.cost.avg_net_price.public']),
     netAvgPrivate: numOrNull(row['latest.cost.avg_net_price.private']),
-    netLowPublic: numOrNull(row['latest.cost.net_price.public.by_income_level.0-30000']),
-    netLowPrivate: numOrNull(row['latest.cost.net_price.private.by_income_level.0-30000']),
+    incPublic: {
+      '0-30000': numOrNull(row['latest.cost.net_price.public.by_income_level.0-30000']),
+      '30001-48000': numOrNull(row['latest.cost.net_price.public.by_income_level.30001-48000']),
+      '48001-75000': numOrNull(row['latest.cost.net_price.public.by_income_level.48001-75000']),
+      '75001-110000': numOrNull(row['latest.cost.net_price.public.by_income_level.75001-110000']),
+      '110001-plus': numOrNull(row['latest.cost.net_price.public.by_income_level.110001-plus']),
+    },
+    incPrivate: {
+      '0-30000': numOrNull(row['latest.cost.net_price.private.by_income_level.0-30000']),
+      '30001-48000': numOrNull(row['latest.cost.net_price.private.by_income_level.30001-48000']),
+      '48001-75000': numOrNull(row['latest.cost.net_price.private.by_income_level.48001-75000']),
+      '75001-110000': numOrNull(row['latest.cost.net_price.private.by_income_level.75001-110000']),
+      '110001-plus': numOrNull(row['latest.cost.net_price.private.by_income_level.110001-plus']),
+    },
     gradRate: numOrNull(row['latest.completion.completion_rate_4yr_150nt']),
     retention: numOrNull(row['latest.student.retention_rate.four_year.full_time']),
     earnings: numOrNull(row['latest.earnings.10_yrs_after_entry.median']),
@@ -470,12 +490,25 @@ function classifyAdmissibility(student, d) {
   return 'Reach';
 }
 
-// Choose the most relevant net price + a short clarifying note.
-// (With a real income input we could pick the exact bracket; absent that, we use
-// the lowest-income bracket as the aid estimate, else the school's average.)
-function pickNetPrice(d, needsAid) {
+// Map the intake income bands (20k bands) to Scorecard's net-price income brackets.
+const INCOME_BRACKET = {
+  'under-20k': '0-30000', '20k-40k': '30001-48000', '40k-60k': '48001-75000',
+  '60k-80k': '48001-75000', '80k-100k': '75001-110000', '100k-120k': '75001-110000',
+  '120k-plus': '110001-plus',
+};
+
+// Choose the most relevant net price + a short clarifying note. If the student gave
+// an income band, use that exact Scorecard bracket; else fall back to the lowest
+// bracket when aid is needed; else the school's average net price.
+function pickNetPrice(d, needsAid, income) {
+  const bk = INCOME_BRACKET[income];
+  if (bk && d.incPublic && d.incPrivate) {
+    const v = d.incPublic[bk] != null ? d.incPublic[bk] : d.incPrivate[bk];
+    if (v != null) return { value: v, note: ' (est. for your income band)' };
+  }
   if (needsAid) {
-    const low = d.netLowPublic != null ? d.netLowPublic : d.netLowPrivate;
+    const low = (d.incPublic && d.incPublic['0-30000'] != null) ? d.incPublic['0-30000']
+              : (d.incPrivate && d.incPrivate['0-30000'] != null) ? d.incPrivate['0-30000'] : null;
     if (low != null) return { value: low, note: ' (lower-income est.)' };
   }
   const avg = d.netAvgPublic != null ? d.netAvgPublic : d.netAvgPrivate;
@@ -485,3 +518,141 @@ function pickNetPrice(d, needsAid) {
 
 function numOrNull(v) { return (v === null || v === undefined || v === '') ? null : Number(v); }
 function fmtK(n) { return Math.round(n / 1000) + 'K'; }
+
+// ============================================================================
+// TWO-PASS SELECTION (data-driven shortlist)
+// Pass 1 (fast model) proposes a candidate pool of real schools -> we attach
+// CURRENT College Scorecard data to each -> Pass 2 (strong model) makes the
+// final pick FROM those verified numbers. Any failure throws so the caller
+// falls back to the proven single-pass flow.
+// ============================================================================
+
+// Fetch + robustly parse a JSON array from one Claude call.
+async function callClaudeForJson(apiKey, model, prompt, maxTokens) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error('Anthropic ' + response.status + ': ' + JSON.stringify(err));
+  }
+  const data = await response.json();
+  let text = (data.content || []).map(b => b.text || '').join('');
+  text = text.replace(/```json|```/g, '').trim();
+  const stripTrailingCommas = (t) => t.replace(/,(\s*[}\]])/g, '$1');
+  const variants = [];
+  const m = text.match(/\[[\s\S]*\]/);
+  if (m) variants.push(m[0], stripTrailingCommas(m[0]));
+  variants.push(text, stripTrailingCommas(text));
+  let parseErr;
+  for (const v of variants) {
+    try { return JSON.parse(v); } catch (e) { parseErr = e; }
+  }
+  console.error('Unparseable model output (first 500 chars):', text.slice(0, 500));
+  throw new Error('Could not parse model JSON: ' + (parseErr && parseErr.message));
+}
+
+async function runTwoPass(apiKey, p, needsAid, basePrompt, sort) {
+  // Pass 1 — fast model proposes a candidate pool (names only).
+  const candidates = await callClaudeForJson(apiKey, 'claude-haiku-4-5-20251001', buildCandidatePrompt(p, sort), 1500);
+  if (!Array.isArray(candidates) || candidates.length < 10) {
+    throw new Error('Pass 1 returned too few candidates');
+  }
+  const pool = candidates.slice(0, 18).map((c) => ({
+    name: String((c && (c.name || c.school)) || '').trim(),
+    location: [c && c.city, c && c.state].filter(Boolean).join(', '),
+  })).filter((c) => c.name);
+  if (pool.length < 10) throw new Error('Pass 1 produced too few valid names');
+
+  // Attach REAL Scorecard data to every candidate (parallel).
+  const datas = await Promise.allSettled(pool.map((c) => fetchScorecard(c, apiKey)));
+  const student = parseStudentTest(p);
+  const lines = pool.map((c, i) => {
+    const d = datas[i].status === 'fulfilled' ? datas[i].value : null;
+    const loc = c.location ? ' (' + c.location + ')' : '';
+    if (!d) return `- ${c.name}${loc}: (no verified data found)`;
+    const admit = d.admitRate != null ? Math.round(d.admitRate * 100) + '% admit' : 'admit n/a';
+    const sat = (d.sat25 != null && d.sat75 != null) ? `, SAT ${d.sat25}-${d.sat75}` : '';
+    const act = (d.act25 != null && d.act75 != null) ? `, ACT ${d.act25}-${d.act75}` : '';
+    const size = d.size != null ? `, ${d.size.toLocaleString()} ugrad` : '';
+    const net = pickNetPrice(d, needsAid, p && p.income);
+    const cls = classifyAdmissibility(student, d);
+    return `- ${c.name}${loc}: ${admit}${sat}${act}${size}${net ? ', net ~$' + fmtK(net.value) + '/yr' : ''}${cls ? ', looks ' + cls : ''}`;
+  });
+
+  const poolText = 'VERIFIED CANDIDATE POOL (current College Scorecard data). Choose your final 10 FROM THIS POOL ONLY, using these REAL numbers for cost / size / admit rate / admissibility — do not substitute remembered figures:\n'
+    + lines.join('\n') + '\n\n';
+
+  // Pass 2 — strong model makes the final, data-driven selection.
+  return await callClaudeForJson(apiKey, 'claude-opus-4-5', poolText + basePrompt, 8000);
+}
+
+// Compact prompt for the candidate-shortlist pass (names only).
+function buildCandidatePrompt(p, sort) {
+  return `You are a US college expert. A student is using the Next4 card-sort matcher. Propose ~16 REAL US colleges that plausibly fit, respecting the hard filters. Return ONLY a JSON array of objects { "name": "Full Official Name", "city": "City", "state": "ST" } — no prose, no markdown.
+
+STUDENT: home state ${p.location || '?'}, GPA ${p.gpa || '?'}, test ${p.testType || '?'} ${p.testScore || ''}, budget ${p.budget || '?'}, major ${p.major || '?'}, grade ${p.grade || '?'}.
+MUST HAVE: ${(sort.mustHave || []).join(', ') || 'none'}
+WOULD LIKE: ${(sort.wouldLike || []).join(', ') || 'none'}
+WOULD RATHER NOT: ${(sort.preferNot || []).join(', ') || 'none'}
+NOT FOR ME (exclude): ${(sort.dontLike || []).join(', ') || 'none'}
+${sort.dimensionSection || ''}
+Respect the hard filters: region/location cards, college size, intended-major strength, weather (no snowy states if "Snow" is Not For Me), and EVERY must-have. Include a realistic spread from likely to reach. Names must be exact and real so they can be looked up in a database.`;
+}
+
+// ============================================================================
+// BEA REGIONAL PRICE PARITIES (state cost-of-living, free api.data via BEA API)
+// One call returns RPP for every state (100 = US average, lower = cheaper). Used
+// only for the "Low Cost of Living Area" card. No-op without BEA_API_KEY.
+// Docs: https://apps.bea.gov/api/  (dataset Regional, table SARPP, line 1 = all items)
+// ============================================================================
+const US_POSTAL_BY_NAME = {
+  'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA','Colorado':'CO',
+  'Connecticut':'CT','Delaware':'DE','District of Columbia':'DC','Florida':'FL','Georgia':'GA',
+  'Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA','Kansas':'KS','Kentucky':'KY',
+  'Louisiana':'LA','Maine':'ME','Maryland':'MD','Massachusetts':'MA','Michigan':'MI','Minnesota':'MN',
+  'Mississippi':'MS','Missouri':'MO','Montana':'MT','Nebraska':'NE','Nevada':'NV','New Hampshire':'NH',
+  'New Jersey':'NJ','New Mexico':'NM','New York':'NY','North Carolina':'NC','North Dakota':'ND','Ohio':'OH',
+  'Oklahoma':'OK','Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC',
+  'South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT','Virginia':'VA',
+  'Washington':'WA','West Virginia':'WV','Wisconsin':'WI','Wyoming':'WY',
+};
+
+async function fetchStateRPP(beaKey) {
+  if (!beaKey) return null;
+  const url = 'https://apps.bea.gov/api/data?&UserID=' + encodeURIComponent(beaKey)
+    + '&method=GetData&datasetname=Regional&TableName=SARPP&LineCode=1&GeoFips=STATE&Year=LAST1&ResultFormat=JSON';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  let json;
+  try {
+    const r = await fetch(url, { signal: controller.signal });
+    if (!r.ok) return null;
+    json = await r.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+  const rows = json && json.BEAAPI && json.BEAAPI.Results && json.BEAAPI.Results.Data;
+  if (!Array.isArray(rows)) return null;
+  const out = {};
+  for (const row of rows) {
+    const postal = US_POSTAL_BY_NAME[String(row.GeoName || '').trim()];
+    const val = parseFloat(String(row.DataValue || '').replace(/[^0-9.]/g, ''));
+    if (postal && !Number.isNaN(val)) out[postal] = Math.round(val);
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+function buildRppSection(rppMap) {
+  if (!rppMap || !Object.keys(rppMap).length) return '';
+  const entries = Object.entries(rppMap).sort((a, b) => a[1] - b[1]).map(([st, v]) => `${st} ${v}`).join(', ');
+  return '\nCOST OF LIVING by state (BEA Regional Price Parities; 100 = US average, lower = cheaper). For the "Low Cost of Living Area" card, a school qualifies only if its state RPP is below ~97; never credit a high-RPP state:\n' + entries + '\n';
+}
