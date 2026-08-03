@@ -9,8 +9,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { mustHave, wouldLike, dontCare, preferNot, dontLike, studentProfile, mustHaveByCategory, wouldLikeByCategory } = req.body;
+    const {
+      mustHave: rawMustHave, wouldLike, dontCare, preferNot, dontLike,
+      studentProfile, mustHaveByCategory, wouldLikeByCategory, categoryRank,
+    } = req.body;
     const p = studentProfile || {};
+
+    // Defensive server-side cap: the frontend enforces a 12-card Must Have limit
+    // (raised from an unlimited count so each Must Have carries more signal for
+    // the model), but never trust the client alone — clamp here too.
+    const mustHave = Array.isArray(rawMustHave) ? rawMustHave.slice(0, 12) : [];
+    if (Array.isArray(rawMustHave) && rawMustHave.length > 12) {
+      console.warn(JSON.stringify({ event: 'must_have_over_cap', received: rawMustHave.length, ts: new Date().toISOString() }));
+    }
 
     // Detect whether the student signaled a need for financial aid anywhere in
     // their card sort or profile. Drives net-price (vs sticker-price) evaluation.
@@ -23,7 +34,9 @@ export default async function handler(req, res) {
       budgetStr.includes('under $15') || budgetStr.includes('significant');
 
     // Summarize how the student's MUST HAVE + WOULD LIKE cards distribute across
-    // the 7 preference categories so the model can weight by DIMENSION, not just
+    // the 6 preference categories (Fields of Study now lives only in the intake
+    // major question, not as sortable cards) so the model can weight by DIMENSION,
+    // not just
     // by individual card. MUST HAVE counts double. Empty if frontend didn't send it.
     const dimCounts = {};
     for (const [cat, names] of Object.entries(mustHaveByCategory || {})) {
@@ -34,8 +47,19 @@ export default async function handler(req, res) {
     }
     const dimRows = Object.entries(dimCounts).sort((a, b) => b[1] - a[1]);
     const dimensionSection = dimRows.length
-      ? "\nPRIORITY DIMENSIONS (how this student's MUST HAVE + WOULD LIKE cards spread across the 7 categories, ranked by weight; MUST HAVE counts double). Use this to see what matters MOST to this student and to balance the final list across their emphasized dimensions, not just isolated cards. If one or two dimensions dominate, weight schools that genuinely excel on those:\n"
+      ? "\nPRIORITY DIMENSIONS (how this student's MUST HAVE + WOULD LIKE cards spread across the 6 categories, ranked by weight; MUST HAVE counts double). Use this to see what matters MOST to this student and to balance the final list across their emphasized dimensions, not just isolated cards. If one or two dimensions dominate, weight schools that genuinely excel on those:\n"
         + dimRows.map(([cat, w]) => `- ${cat} (weight ${w})`).join('\n') + '\n'
+      : '';
+
+    // Student's SELF-DECLARED category priority, collected before the card sort
+    // even begins (a ranking screen shown right after intake). This is a
+    // SECONDARY, directional signal only — it must never override what the
+    // student's actual MUST HAVE / WOULD LIKE card choices say. If the two
+    // signals ever conflict, the card-based dimensionSection above wins.
+    const rankSection = (Array.isArray(categoryRank) && categoryRank.length)
+      ? "\nSTUDENT'S DECLARED CATEGORY PRIORITY (self-ranked before seeing any cards, 1 = most important): "
+        + categoryRank.map((c, i) => `${i + 1}. ${c}`).join(', ')
+        + ". Use this only as directional context for what broadly matters most to this student. It must NEVER override or contradict the PRIORITY DIMENSIONS above, which are derived from their actual card choices during the sort — those are the authoritative signal. If this declared ranking and the card-based dimensions ever seem to disagree, trust the card-based dimensions.\n"
       : '';
 
     // Live cost-of-living reference (BEA state Regional Price Parities) — only
@@ -44,10 +68,19 @@ export default async function handler(req, res) {
     const wantsLowCost = [...(mustHave || []), ...(wouldLike || [])].some(c => /low cost of living/i.test(String(c)));
     const rppSection = wantsLowCost ? buildRppSection(await fetchStateRPP(process.env.BEA_API_KEY)) : '';
 
+    // GPA is now a free-typed number plus a self-reported scale (weighted /
+    // unweighted / unspecified) instead of a fixed dropdown range. Build a
+    // plain-language description so the prompt below can interpret it, since
+    // weighted and unweighted numbers mean very different things.
+    const gpaScale = String(p.gpaScale || '').toLowerCase();
+    const gpaDisplay = p.gpa
+      ? `${p.gpa}${gpaScale === 'weighted' ? ' (weighted scale)' : gpaScale === 'unweighted' ? ' (unweighted 4.0 scale)' : ' (scale not specified — treat as unweighted)'}`
+      : 'Not specified';
+
     const profileContext = `
 STUDENT PROFILE (use this to calibrate every recommendation):
 - Home state: ${p.location || 'Not specified'}
-- GPA range: ${p.gpa || 'Not specified'}
+- GPA: ${gpaDisplay}
 - Standardized testing: ${p.testType || 'Not specified'}${p.testScore && p.testScore !== 'N/A' ? ` (Score: ${p.testScore})` : ''}
 - Annual budget: ${p.budget || 'Not specified'}
 - Intended major: ${p.major || 'Not specified'}
@@ -64,7 +97,7 @@ WOULD LIKE THIS (high priority - strongly weight these in scoring): ${(wouldLike
 DOESN'T MATTER (neutral): ${(dontCare || []).join(', ') || 'none'}
 WOULD RATHER NOT (negative weight - penalize schools with these traits): ${(preferNot || []).join(', ') || 'none'}
 NOT FOR ME (deal-breaker - automatically disqualify any school strongly associated with these): ${(dontLike || []).join(', ') || 'none'}
-${dimensionSection}${rppSection}
+${dimensionSection}${rankSection}${rppSection}
 
 ==================================================================
 DATA SOURCE ANCHORING - read first, applies to every number you output
@@ -82,26 +115,34 @@ Your training data drifts and schools change selectivity, price, and programs ev
 CONFIDENCE RULE: Every numeric tag (admit rate, net price, test percentile, enrollment, placement rate, earnings) MUST be anchored to a source above. If you are not confident a figure is current and correct, do NOT state a precise number - describe it as approximate ("~"), round conservatively, choose the MORE conservative admissibility tier, and flag the uncertainty in the caveat sentence. Never fabricate precise statistics.
 
 ==================================================================
+GPA INTERPRETATION - read the scale before applying tiers below
+==================================================================
+The student's GPA was collected as a free-typed number plus a self-reported scale (weighted or unweighted), not a fixed range. Interpret it carefully before applying the SEARCH AMBITION tiers below:
+- Unweighted (standard 4.0 scale): 4.0 = essentially all A's. Apply the tiers below directly to this number.
+- Weighted (commonly runs up to ~5.0): schools typically add roughly +0.5 to +1.0 per Honors/AP/IB class, so a weighted number overstates true unweighted rigor. Mentally discount a weighted number toward its likely unweighted-equivalent before applying the tiers below - a 4.3 weighted GPA is roughly comparable to a high-3-point unweighted student's rigor, NOT a perfect unweighted student. Use reasonable judgment based on typical weighting conventions rather than a rigid formula.
+- Scale not specified: treat the number as unweighted (the more conservative assumption).
+
+==================================================================
 TWO INDEPENDENT SYSTEMS - do not let them contradict each other
 ==================================================================
 SYSTEM A - SEARCH AMBITION (how selective the schools you SEARCH should be).
-This tells you how high to aim. It does NOT label individual schools.
-- GPA 4.1+ with SAT 1450+ or ACT 33+: search includes highly selective schools (admit rate under 20%)
-- GPA 3.6-4.0 with SAT 1300-1450 or ACT 28-32: selective and mid-selective (admit 20-50%)
-- GPA 3.1-3.5 with SAT 1100-1290 or ACT 22-27: mostly accessible schools (admit 50-80%), a few stretch options
-- GPA 2.6-3.0: accessible / broad-access schools (admit 70%+)
-- GPA 2.0-2.5: accessible schools, community-college transfer pathways
-- GPA 1.6-1.9: open-admission schools, community colleges, schools with strong academic support and transfer pathways
-- GPA 1.5 and below: community colleges, trade schools, certification programs, schools with extensive academic support
-- Test-optional or no scores: rely on GPA alone, lean conservative on selectivity
+This tells you how high to aim. It does NOT label individual schools. Apply these tiers to the INTERPRETED (scale-adjusted) GPA from above:
+- Interpreted GPA 4.1+ with SAT 1450+ or ACT 33+: search includes highly selective schools (admit rate under 20%)
+- Interpreted GPA 3.6-4.0 with SAT 1300-1450 or ACT 28-32: selective and mid-selective (admit 20-50%)
+- Interpreted GPA 3.1-3.5 with SAT 1100-1290 or ACT 22-27: mostly accessible schools (admit 50-80%), a few stretch options
+- Interpreted GPA 2.6-3.0: accessible / broad-access schools (admit 70%+)
+- Interpreted GPA 2.0-2.5: accessible schools, community-college transfer pathways
+- Interpreted GPA 1.6-1.9: open-admission schools, community colleges, schools with strong academic support and transfer pathways
+- Interpreted GPA 1.5 and below: community colleges, trade schools, certification programs, schools with extensive academic support
+- Test-optional or no scores: rely on interpreted GPA alone, lean conservative on selectivity
 
 SYSTEM B - PER-SCHOOL ADMISSIBILITY CLASSIFICATION (label each result honestly).
-SEPARATELY, for EACH school you recommend, compare THIS student's GPA and test scores to THAT school's admitted-student profile (anchor to the school's Common Data Set / College Scorecard / IPEDS) and classify it independently:
+SEPARATELY, for EACH school you recommend, compare THIS student's interpreted GPA and test scores to THAT school's admitted-student profile (anchor to the school's Common Data Set / College Scorecard / IPEDS) and classify it independently:
 - "Likely": student's GPA/test are at or above the school's 75th-percentile admitted profile, and admit rate is not punishing.
 - "Target": student's stats fall within the school's middle-50% admitted profile.
 - "Reach": student's stats are below the 25th percentile, OR the school's admit rate is under 20% (sub-20% schools are a Reach for everyone, regardless of stats).
 
-These two systems are INDEPENDENT. System A decides how high to aim; System B honestly labels each result. A 4.1-GPA student will still have Reach schools (e.g., sub-20% admit schools) and must also have at least one Likely. Never let the GPA tier override the honest per-school label.
+These two systems are INDEPENDENT. System A decides how high to aim; System B honestly labels each result. A top-tier student will still have Reach schools (e.g., sub-20% admit schools) and must also have at least one Likely. Never let the GPA tier override the honest per-school label.
 HARD REQUIREMENT: the final list of 8 MUST contain at least 1 "Likely" and at least 1 "Reach", and must NOT be entirely "Reach".
 
 ==================================================================
@@ -111,7 +152,7 @@ ${needsAid
   ? `This student needs financial aid. Evaluate affordability on ESTIMATED NET PRICE after need-based aid (anchor: College Scorecard net-price-by-income + the school's Net Price Calculator), NOT published sticker tuition.
 - ACTIVELY INCLUDE high-sticker schools that meet ~100% of demonstrated need (e.g., Ivies, Stanford, MIT, Amherst, Williams, Pomona, Bowdoin) and well-endowed liberal-arts colleges - for an aided student their net price is often far below an out-of-state public, and excluding them on sticker price alone is a mistake.
 - Do NOT exclude a school for a high sticker price if its likely net price fits the student's means. Note the sticker-vs-net distinction in the caveat.`
-  : `No explicit aid need was signaled - filter on the student's stated budget against typical cost:
+  : `No explicit aid need was signaled - filter on the student's stated budget against typical cost. IMPORTANT: for public universities, sticker tuition depends heavily on residency - always distinguish in-state vs out-of-state sticker price for THIS student's home state, never assume in-state pricing for an out-of-state student:
 - Under $15,000/year: in-state publics, community colleges, schools with major merit scholarships
 - $15,000-$30,000/year: in-state publics, out-of-state publics with good aid, privates that meet full need
 - $30,000-$50,000/year: most public universities, privates with strong need-based aid
@@ -148,6 +189,10 @@ SIZE:
 - Medium Sized College = 3,000 to 15,000 undergrads
 - Large College = over 15,000 undergrads
 
+INSTITUTION TYPE:
+- Public / State University: state-funded institution. Sticker tuition differs sharply by residency - always use THIS student's home state to determine in-state vs out-of-state pricing.
+- Private University: independently funded, not state-run. Sticker tuition does not vary by residency, though need-based/merit aid can still make net price far lower than sticker.
+
 CULTURE & IDENTITY (Campus Culture):
 - HBCU: only officially designated Historically Black Colleges and Universities
 - Hispanic Serving Institution: only schools with official HSI federal designation (25%+ Hispanic enrollment)
@@ -182,7 +227,7 @@ WEATHER: If Snow is Not For Me, never recommend schools in MN, WI, VT, ME, NH, N
 ==================================================================
 HANDLING MUST HAVE / WOULD LIKE CARDS
 ==================================================================
-QUALITY-WEIGHTING RULE: When a card is "Must Have" or "Would Like This," do not merely confirm the school HAS that feature - weight toward schools genuinely EXCEPTIONAL or nationally recognized for it (e.g. "Community Service" -> Tulane, Berea; "Research Opportunities" -> schools with strong, documented undergraduate research funding/output). The strength of the preference should map to the strength/reputation of that feature at the recommended school.
+QUALITY-WEIGHTING RULE: When a card is "Must Have" or "Would Like This," do not merely confirm the school HAS that feature - weight toward schools genuinely EXCEPTIONAL or nationally recognized for it (e.g. "Community Service" -> Tulane, Berea; "Research Opportunities" -> schools with strong, documented undergraduate research funding/output). The strength of the preference should map to the strength/reputation of that feature at the recommended school. Because Must Have selections are now capped at 12 cards, treat every Must Have as a genuinely high-signal, deliberate choice.
 
 CATCH-ALL FALLBACK (applies to EVERY MUST HAVE without an explicit rule above): treat the card as a HARD requirement for documented institutional strength in that area. Never silently ignore a MUST HAVE. Every MUST HAVE card must be reflected in each recommended school, or that school must be excluded.
 
@@ -216,7 +261,7 @@ Return a JSON array of exactly 10 school objects, ordered by fitPercent descendi
 - "fitPercent": honest integer 52-99
 - "admissibility": exactly one of "Likely" | "Target" | "Reach"
 - "tags": an OBJECT with exactly these four NAMED string fields (named so they can never render out of order):
-    - "cost": affordability tier - net price if aid-relevant (e.g. "Net ~$19K/yr after aid" or "In-state ~$12K/yr")
+    - "cost": affordability tier - for public schools, distinguish in-state vs out-of-state sticker for THIS student, and net price if aid-relevant (e.g. "In-state ~$13K/yr tuition (net ~$9K after aid)" or "Out-of-state ~$40K/yr tuition")
     - "size": size category + approx undergrad enrollment (e.g. "Medium, ~9,400 ugrad")
     - "program": key program strength tied to the student's major/priorities (e.g. "Top-20 ABET Engineering")
     - "fit": admissibility label + admit-rate context (e.g. "Target, ~38% admit")
@@ -229,7 +274,8 @@ FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fa
 4. At least 1 school is "Likely" and at least 1 is "Reach"; not all are "Reach".
 5. No more than 2 schools from the same state.
 6. Every MUST HAVE card is reflected in the recommended schools (schools that fail a MUST HAVE were excluded).
-7. Every numeric figure is source-anchored or explicitly hedged as approximate - no fabricated precise stats.`;
+7. Every numeric figure is source-anchored or explicitly hedged as approximate - no fabricated precise stats.
+8. For every public-school cost tag, in-state vs out-of-state is correctly distinguished for THIS student's home state.`;
 
     // ── SCHOOL SELECTION ──────────────────────────────────────────────────
     // Two-pass when Scorecard is available (data-driven shortlist): a fast model
@@ -256,10 +302,24 @@ FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fa
     // Final verification layer: replace any remembered figures with REAL
     // Scorecard data and recompute admissibility. No-op if no key / API down.
     schools = await enrichWithScorecard(schools, p, needsAid);
+
+    // Passive success log — lets Luka grep Vercel logs for match_success vs
+    // match_error counts to see clean-run-to-error ratio over time.
+    console.log(JSON.stringify({
+      event: 'match_success',
+      schoolCount: schools.length,
+      verifiedCount: schools.filter(s => s.verified).length,
+      ts: new Date().toISOString(),
+    }));
+
     return res.status(200).json({ schools });
 
   } catch (error) {
-    console.error('Backend error:', error);
+    console.error(JSON.stringify({
+      event: 'match_error',
+      message: error && error.message,
+      ts: new Date().toISOString(),
+    }));
     return res.status(500).json({ error: error.message });
   }
 }
@@ -345,9 +405,17 @@ function sanitizeSchools(schools) {
 // NOTE FOR THE NATIVE APP: this is a clean, isolated function. A native backend
 // (no serverless timeout) could extend it to a two-pass design — feed these
 // verified numbers back to the model to drive SELECTION, not just display.
+//
+// RESIDENCY FIX (2026-07): Scorecard's avg_net_price fields are blended across
+// a school's ENTIRE population (mostly in-state at big publics), which badly
+// understates cost for an out-of-state full-pay student. We now also pull
+// latest.cost.tuition.in_state / out_of_state (published sticker tuition by
+// residency) plus the school's own id (== IPEDS UnitID) and state, and compare
+// against the student's home state to show the correct sticker figure.
 // ============================================================================
 
 const SCORECARD_FIELDS = [
+  'id',
   'school.name', 'school.city', 'school.state',
   'latest.student.size',
   'latest.admissions.admission_rate.overall',
@@ -355,6 +423,8 @@ const SCORECARD_FIELDS = [
   'latest.admissions.sat_scores.75th_percentile.overall',
   'latest.admissions.act_scores.25th_percentile.cumulative',
   'latest.admissions.act_scores.75th_percentile.cumulative',
+  'latest.cost.tuition.in_state',
+  'latest.cost.tuition.out_of_state',
   'latest.cost.avg_net_price.public',
   'latest.cost.avg_net_price.private',
   'latest.cost.net_price.public.by_income_level.0-30000',
@@ -377,6 +447,7 @@ async function enrichWithScorecard(schools, profile, needsAid) {
   if (!apiKey) return schools; // graceful fallback: no key -> model output as-is
 
   const student = parseStudentTest(profile);
+  const studentPostal = US_POSTAL_BY_NAME[String((profile && profile.location) || '').trim()] || '';
 
   // Look up every school in parallel; one slow/failed lookup can't block others.
   const results = await Promise.allSettled(
@@ -392,12 +463,20 @@ async function enrichWithScorecard(schools, profile, needsAid) {
       : size < 3000 ? 'Small' : size <= 15000 ? 'Medium' : 'Large';
     const admitPct = data.admitRate != null ? Math.round(data.admitRate * 100) : null;
     const net = pickNetPrice(data, needsAid, profile && profile.income);
+    const sticker = pickStickerTuition(data, studentPostal);
     const admissibility = classifyAdmissibility(student, data) || s.admissibility;
 
     // Rebuild the self-labeled tag array with verified numbers. tags[2] (program
     // strength) stays from the model — Scorecard has no program-quality metric.
+    // Cost tag now leads with the residency-correct STICKER price (the actual
+    // published tuition this specific student would be charged), with the
+    // aid-adjusted net price shown alongside it for context.
+    const costTag = sticker != null
+      ? `${sticker.label} ~$${fmtK(sticker.value)}/yr${net != null ? ` (net ~$${fmtK(net.value)}/yr${net.note})` : ''}`
+      : (net != null ? `${needsAid ? 'Est. net' : 'Net'} ~$${fmtK(net.value)}/yr${net.note}` : (s.tags[0] || ''));
+
     const tags = [
-      net != null ? `${needsAid ? 'Est. net' : 'Net'} ~$${fmtK(net.value)}/yr${net.note}` : (s.tags[0] || ''),
+      costTag,
       sizeCat ? `${sizeCat} · ${size.toLocaleString()} ugrad` : (s.tags[1] || ''),
       s.tags[2] || '',
       admitPct != null ? `${admissibility} · ${admitPct}% admit` : `${admissibility}`,
@@ -438,12 +517,16 @@ async function fetchScorecard(school, apiKey) {
   const row = rows.find((x) => String(x['school.name'] || '').toLowerCase() === lower) || rows[0];
 
   return {
+    unitid: numOrNull(row['id']),
+    state: String(row['school.state'] || '').trim().toUpperCase(),
     size: numOrNull(row['latest.student.size']),
     admitRate: numOrNull(row['latest.admissions.admission_rate.overall']),
     sat25: numOrNull(row['latest.admissions.sat_scores.25th_percentile.overall']),
     sat75: numOrNull(row['latest.admissions.sat_scores.75th_percentile.overall']),
     act25: numOrNull(row['latest.admissions.act_scores.25th_percentile.cumulative']),
     act75: numOrNull(row['latest.admissions.act_scores.75th_percentile.cumulative']),
+    tuitionInState: numOrNull(row['latest.cost.tuition.in_state']),
+    tuitionOutState: numOrNull(row['latest.cost.tuition.out_of_state']),
     netAvgPublic: numOrNull(row['latest.cost.avg_net_price.public']),
     netAvgPrivate: numOrNull(row['latest.cost.avg_net_price.private']),
     incPublic: {
@@ -516,6 +599,20 @@ function pickNetPrice(d, needsAid, income) {
   return null;
 }
 
+// Residency-correct PUBLISHED (sticker) tuition — the actual number this
+// specific student would be charged, distinct from the blended net-price
+// average above. Falls back to whichever sticker figure exists if the
+// residency-specific one is missing (e.g. private schools have no in/out
+// split at all, which is expected and fine).
+function pickStickerTuition(d, studentPostal) {
+  const inState = !!(studentPostal && d.state && studentPostal === d.state);
+  if (inState && d.tuitionInState != null) return { value: d.tuitionInState, label: 'In-state' };
+  if (!inState && d.tuitionOutState != null) return { value: d.tuitionOutState, label: 'Out-of-state' };
+  if (d.tuitionInState != null) return { value: d.tuitionInState, label: 'Sticker' };
+  if (d.tuitionOutState != null) return { value: d.tuitionOutState, label: 'Sticker' };
+  return null;
+}
+
 function numOrNull(v) { return (v === null || v === undefined || v === '') ? null : Number(v); }
 function fmtK(n) { return Math.round(n / 1000) + 'K'; }
 
@@ -573,6 +670,7 @@ async function runTwoPass(apiKey, p, needsAid, basePrompt, sort) {
   // Attach REAL Scorecard data to every candidate (parallel).
   const datas = await Promise.allSettled(pool.map((c) => fetchScorecard(c, apiKey)));
   const student = parseStudentTest(p);
+  const studentPostal = US_POSTAL_BY_NAME[String((p && p.location) || '').trim()] || '';
   const lines = pool.map((c, i) => {
     const d = datas[i].status === 'fulfilled' ? datas[i].value : null;
     const loc = c.location ? ' (' + c.location + ')' : '';
@@ -582,11 +680,12 @@ async function runTwoPass(apiKey, p, needsAid, basePrompt, sort) {
     const act = (d.act25 != null && d.act75 != null) ? `, ACT ${d.act25}-${d.act75}` : '';
     const size = d.size != null ? `, ${d.size.toLocaleString()} ugrad` : '';
     const net = pickNetPrice(d, needsAid, p && p.income);
+    const sticker = pickStickerTuition(d, studentPostal);
     const cls = classifyAdmissibility(student, d);
-    return `- ${c.name}${loc}: ${admit}${sat}${act}${size}${net ? ', net ~$' + fmtK(net.value) + '/yr' : ''}${cls ? ', looks ' + cls : ''}`;
+    return `- ${c.name}${loc}: ${admit}${sat}${act}${size}${sticker ? ', ' + sticker.label.toLowerCase() + ' sticker ~$' + fmtK(sticker.value) + '/yr' : ''}${net ? ', net ~$' + fmtK(net.value) + '/yr' : ''}${cls ? ', looks ' + cls : ''}`;
   });
 
-  const poolText = 'VERIFIED CANDIDATE POOL (current College Scorecard data). Choose your final 10 FROM THIS POOL ONLY, using these REAL numbers for cost / size / admit rate / admissibility — do not substitute remembered figures:\n'
+  const poolText = 'VERIFIED CANDIDATE POOL (current College Scorecard data). Choose your final 10 FROM THIS POOL ONLY, using these REAL numbers for cost / size / admit rate / admissibility — do not substitute remembered figures. Sticker prices shown are already residency-correct for this specific student:\n'
     + lines.join('\n') + '\n\n';
 
   // Pass 2 — strong model makes the final, data-driven selection.
@@ -597,7 +696,7 @@ async function runTwoPass(apiKey, p, needsAid, basePrompt, sort) {
 function buildCandidatePrompt(p, sort) {
   return `You are a US college expert. A student is using the Next4 card-sort matcher. Propose ~16 REAL US colleges that plausibly fit, respecting the hard filters. Return ONLY a JSON array of objects { "name": "Full Official Name", "city": "City", "state": "ST" } — no prose, no markdown.
 
-STUDENT: home state ${p.location || '?'}, GPA ${p.gpa || '?'}, test ${p.testType || '?'} ${p.testScore || ''}, budget ${p.budget || '?'}, major ${p.major || '?'}, grade ${p.grade || '?'}.
+STUDENT: home state ${p.location || '?'}, GPA ${p.gpa || '?'}${p.gpaScale ? ' (' + p.gpaScale + ')' : ''}, test ${p.testType || '?'} ${p.testScore || ''}, budget ${p.budget || '?'}, major ${p.major || '?'}, grade ${p.grade || '?'}.
 MUST HAVE: ${(sort.mustHave || []).join(', ') || 'none'}
 WOULD LIKE: ${(sort.wouldLike || []).join(', ') || 'none'}
 WOULD RATHER NOT: ${(sort.preferNot || []).join(', ') || 'none'}
