@@ -31,6 +31,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 
 /* ── INTAKE FORM ── */
 #intake{background:#1a1814;align-items:center;justify-content:center;padding:0 24px}
+#categoryRank{background:#1a1814;align-items:center;justify-content:center;padding:0 24px}
 .intake-inner{width:100%;max-width:520px;z-index:1;padding:40px 0}
 .intake-logo{font-family:'Bebas Neue',sans-serif;font-size:26px;color:#fff;letter-spacing:1px;margin-bottom:32px}
 .intake-logo span{color:var(--c1)}
@@ -52,6 +53,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .intake-progress{display:flex;gap:6px;margin-bottom:28px}
 .intake-pip{width:28px;height:3px;border-radius:2px;background:rgba(255,255,255,.15);transition:background .3s}
 .intake-pip.active{background:var(--c1)}
+.intake-err{color:#e0736a;font-size:12px;min-height:14px;margin-top:-2px}
+.intake-input.err-field,.intake-btn-group.err-field{border-color:#e0736a}
+.intake-input.err-field{border:1.5px solid #e0736a}
+.cat-rank-row{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1.5px solid rgba(255,255,255,.15);border-radius:8px;cursor:pointer;transition:all .2s;color:#fff}
+.cat-rank-row:hover{border-color:rgba(255,255,255,.4)}
+.cat-rank-row.ranked{border-color:var(--c1);background:rgba(200,69,58,.14)}
+.cat-rank-plus{width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;transition:all .2s;font-family:'DM Mono',monospace}
+.cat-rank-row.ranked .cat-rank-plus{background:var(--c1);border-color:var(--c1);color:#fff;font-weight:600}
+.cat-rank-name{font-size:15px}
 
 /* ── SORTING ── */
 #sorting{background:var(--bg);align-items:center;padding:0 20px}
@@ -267,20 +277,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
           <option>Vermont</option><option>Virginia</option><option>Washington</option><option>West Virginia</option>
           <option>Wisconsin</option><option>Wyoming</option><option>Outside the US</option>
         </select>
+        <div class="intake-err" id="q1err"></div>
       </div>
 
       <div class="intake-q">
         <div class="intake-label">2. What is your current GPA?</div>
-        <select class="intake-input" id="q2">
-          <option value="" disabled selected>Select your GPA range</option>
-          <option value="4.1 and above">4.1 and above</option>
-          <option value="3.6-4.0">3.6 &ndash; 4.0</option>
-          <option value="3.1-3.5">3.1 &ndash; 3.5</option>
-          <option value="2.6-3.0">2.6 &ndash; 3.0</option>
-          <option value="2.0-2.5">2.0 &ndash; 2.5</option>
-          <option value="1.6-1.9">1.6 &ndash; 1.9</option>
-          <option value="1.5 and below">1.5 and below</option>
-        </select>
+        <input class="intake-input" type="number" step="0.01" min="0" max="5" id="q2" placeholder="e.g. 3.85" />
+        <div class="intake-btn-group" id="q2scale">
+          <button class="intake-btn" data-scale="weighted" onclick="selectGpaScale(this)">Weighted</button>
+          <button class="intake-btn" data-scale="unweighted" onclick="selectGpaScale(this)">Unweighted</button>
+        </div>
+        <div class="intake-err" id="q2err"></div>
       </div>
 
       <div class="intake-q">
@@ -293,6 +300,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
           <option value="not-taken">Haven't taken yet</option>
         </select>
         <input class="intake-input" type="number" id="q3-score" placeholder="Enter your score" style="display:none;margin-top:8px" />
+        <div class="intake-err" id="q3err"></div>
       </div>
 
       <div class="intake-q">
@@ -307,11 +315,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
           <option value="need-aid">I'll need significant financial aid regardless</option>
           <option value="not-sure">Not sure yet</option>
         </select>
+        <div class="intake-err" id="q4err"></div>
       </div>
 
       <div class="intake-q">
         <div class="intake-label">5. What do you want to study?</div>
-        <select class="intake-input" id="q5">
+        <select class="intake-input" id="q5" onchange="handleMajor()">
           <option value="" disabled selected>Select a major</option>
           <option value="Undecided">Undecided</option>
           <option>Agriculture &amp; Sustainability</option>
@@ -361,7 +370,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
           <option>Sports Medicine &amp; Kinesiology</option>
           <option>Statistics &amp; Analytics</option>
           <option>Veterinary Science / Pre-Vet</option>
+          <option value="Other">Other (not listed)</option>
         </select>
+        <input class="intake-input" type="text" id="q5-other" placeholder="Type what you want to study" style="display:none;margin-top:8px" />
+        <div class="intake-err" id="q5err"></div>
       </div>
 
       <div class="intake-q" id="qIncomeWrap" style="display:none">
@@ -377,6 +389,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
           <option value="120k-plus">$120,000+</option>
           <option value="prefer-not">Prefer not to say</option>
         </select>
+        <div class="intake-err" id="qIncomeErr"></div>
       </div>
 
       <div class="intake-q">
@@ -388,9 +401,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
           <button class="intake-btn" onclick="selectGrade(this,'Senior')">Senior</button>
           <button class="intake-btn" onclick="selectGrade(this,'Other')">Other</button>
         </div>
+        <div class="intake-err" id="gradeErr"></div>
       </div>
 
       <button class="intake-next" onclick="startSorting()">START SORTING →</button>
+    </div>
+  </div>
+</div>
+
+<!-- CATEGORY RANK -->
+<div id="categoryRank" class="screen">
+  <div class="intake-inner" style="max-width:560px">
+    <div class="intake-logo">Next<span>4</span></div>
+    <div class="intake-title">What Matters<br>Most To You?</div>
+    <div class="intake-sub">Tap categories in order of importance, most important first. This helps us weigh your card sort — but your actual card choices still come first. Skip if you'd rather not rank them.</div>
+    <div id="catRankList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px"></div>
+    <div style="display:flex;gap:10px">
+      <button class="intake-next" style="flex:1;background:transparent;border:1.5px solid rgba(255,255,255,.25);box-shadow:none" onclick="skipCategoryRank()">No Preference</button>
+      <button class="intake-next" style="flex:1" onclick="continueCategoryRank()">Continue →</button>
     </div>
   </div>
 </div>
@@ -400,7 +428,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
   <div class="top-bar">
     <div class="top-logo">Next<span>4</span></div>
     <div class="progress-wrap">
-      <div class="section-bar" id="sectionBar"><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
+      <div class="section-bar" id="sectionBar"><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
       <div class="progress-label" id="pLabel">&nbsp;</div>
     </div>
   </div>
@@ -518,12 +546,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 let intakeData = {
   location:'',
   gpa:'',
+  gpaScale:'',
   testType:'',
   testScore:'',
   budget:'',
   major:'',
   grade:''
 };
+let categoryRankOrder = [];
+
+function selectGpaScale(btn) {
+  document.querySelectorAll('#q2scale .intake-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
 
 function selectGrade(btn, value) {
   document.querySelectorAll('#q6group .intake-btn').forEach(b => b.classList.remove('selected'));
@@ -557,15 +592,110 @@ function handleBudget() {
   if(!need) document.getElementById('qIncome').value = '';
 }
 
+function handleMajor() {
+  const isOther = document.getElementById('q5').value === 'Other';
+  const otherInput = document.getElementById('q5-other');
+  otherInput.style.display = isOther ? 'block' : 'none';
+  if (!isOther) otherInput.value = '';
+}
+
+const REQUIRED_MSG = 'Answer every question to continue';
+
+function clearIntakeErrors() {
+  document.querySelectorAll('.intake-err').forEach(e => e.textContent = '');
+  document.querySelectorAll('.err-field').forEach(e => e.classList.remove('err-field'));
+}
+
 function startSorting() {
-  intakeData.location  = document.getElementById('q1').value || 'Not specified';
-  intakeData.gpa       = document.getElementById('q2').value || 'Not specified';
-  intakeData.testType  = document.getElementById('q3-type').value || 'Not specified';
-  intakeData.testScore = document.getElementById('q3-score').value || 'N/A';
-  intakeData.budget    = document.getElementById('q4').value || 'Not specified';
+  clearIntakeErrors();
+  let ok = true;
+
+  const q1 = document.getElementById('q1').value;
+  if (!q1) { document.getElementById('q1err').textContent = REQUIRED_MSG; document.getElementById('q1').classList.add('err-field'); ok = false; }
+
+  const q2 = document.getElementById('q2').value;
+  const scaleBtn = document.querySelector('#q2scale .intake-btn.selected');
+  if (!q2 || !scaleBtn) { document.getElementById('q2err').textContent = REQUIRED_MSG; ok = false; }
+
+  const testType = document.getElementById('q3-type').value;
+  const testScore = document.getElementById('q3-score').value;
+  if (!testType) {
+    document.getElementById('q3err').textContent = REQUIRED_MSG;
+    document.getElementById('q3-type').classList.add('err-field');
+    ok = false;
+  } else if ((testType === 'SAT' || testType === 'ACT') && !testScore) {
+    document.getElementById('q3err').textContent = REQUIRED_MSG;
+    document.getElementById('q3-score').classList.add('err-field');
+    ok = false;
+  }
+
+  const q4 = document.getElementById('q4').value;
+  if (!q4) { document.getElementById('q4err').textContent = REQUIRED_MSG; document.getElementById('q4').classList.add('err-field'); ok = false; }
+
+  const incomeWrap = document.getElementById('qIncomeWrap');
+  if (incomeWrap && incomeWrap.style.display !== 'none') {
+    const qIncome = document.getElementById('qIncome').value;
+    if (!qIncome) { document.getElementById('qIncomeErr').textContent = REQUIRED_MSG; document.getElementById('qIncome').classList.add('err-field'); ok = false; }
+  }
+
+  const q5 = document.getElementById('q5').value;
+  const q5Other = document.getElementById('q5-other').value.trim();
+  if (!q5) {
+    document.getElementById('q5err').textContent = REQUIRED_MSG;
+    document.getElementById('q5').classList.add('err-field');
+    ok = false;
+  } else if (q5 === 'Other' && !q5Other) {
+    document.getElementById('q5err').textContent = REQUIRED_MSG;
+    document.getElementById('q5-other').classList.add('err-field');
+    ok = false;
+  }
+
+  if (!intakeData.grade) { document.getElementById('gradeErr').textContent = REQUIRED_MSG; ok = false; }
+
+  if (!ok) return;
+
+  intakeData.location  = q1;
+  intakeData.gpa       = q2;
+  intakeData.gpaScale  = scaleBtn.dataset.scale;
+  intakeData.testType  = testType;
+  intakeData.testScore = testScore || 'N/A';
+  intakeData.budget    = q4;
   intakeData.income    = (document.getElementById('qIncome') && document.getElementById('qIncome').value) || '';
-  intakeData.major     = document.getElementById('q5').value || 'Not specified';
-  if (!intakeData.grade) intakeData.grade = 'Not specified';
+  intakeData.major     = (q5 === 'Other') ? q5Other : q5;
+
+  showScreen('categoryRank');
+  renderCategoryRank();
+}
+
+// ── CATEGORY PRIORITY (shown once, right after intake, before the card sort) ──
+function renderCategoryRank() {
+  categoryRankOrder = [];
+  document.getElementById('catRankList').innerHTML = SECTION_ORDER.map((name, i) => `
+    <div class="cat-rank-row" id="catRow-${i}" onclick="toggleCategoryRank(${i})">
+      <span class="cat-rank-plus" id="catPlus-${i}">+</span>
+      <span class="cat-rank-name">${name}</span>
+    </div>`).join('');
+}
+
+function toggleCategoryRank(i) {
+  const name = SECTION_ORDER[i];
+  const pos = categoryRankOrder.indexOf(name);
+  if (pos > -1) categoryRankOrder.splice(pos, 1);
+  else if (categoryRankOrder.length < SECTION_ORDER.length) categoryRankOrder.push(name);
+  SECTION_ORDER.forEach((n, idx2) => {
+    const p = categoryRankOrder.indexOf(n);
+    document.getElementById('catRow-' + idx2).classList.toggle('ranked', p > -1);
+    document.getElementById('catPlus-' + idx2).textContent = p > -1 ? (p + 1) : '+';
+  });
+}
+
+function skipCategoryRank() {
+  categoryRankOrder = [];
+  showScreen('sorting');
+  renderCard();
+}
+
+function continueCategoryRank() {
   showScreen('sorting');
   renderCard();
 }
@@ -573,55 +703,7 @@ function startSorting() {
 // ── ALL CARDS ─────────────────────────────────────────────────
 // Draft 5 — Fully audited card deck (162 cards total)
 const ALL_CARDS=[
-  // FIELDS OF STUDY (49 — added Veterinary Science / Pre-Vet, renamed Liberal Arts)
-  {name:"Sports Medicine & Kinesiology",cat:"Fields of Study",note:"Human movement and athletic health; leads to PT, athletic training"},
-  {name:"International Relations",cat:"Fields of Study"},
-  {name:"Engineering",cat:"Fields of Study"},
-  {name:"Fashion Design",cat:"Fields of Study"},
-  {name:"Sociology",cat:"Fields of Study"},
-  {name:"Business",cat:"Fields of Study"},
-  {name:"Finance",cat:"Fields of Study"},
-  {name:"Philosophy",cat:"Fields of Study"},
-  {name:"Sports Management",cat:"Fields of Study"},
-  {name:"Communications & Journalism",cat:"Fields of Study"},
   {name:"Liberal Arts",cat:"Learning Environment",note:"Broad humanities focus across disciplines"},
-  {name:"Psychology",cat:"Fields of Study"},
-  {name:"Physics",cat:"Fields of Study"},
-  {name:"Geology",cat:"Fields of Study",note:"Study of earth's rocks, minerals & history"},
-  {name:"Education / Teaching",cat:"Fields of Study"},
-  {name:"Public Health",cat:"Fields of Study",note:"Health systems, policy & community wellness"},
-  {name:"Criminal Justice",cat:"Fields of Study"},
-  {name:"Dance",cat:"Fields of Study"},
-  {name:"Statistics & Analytics",cat:"Fields of Study"},
-  {name:"Foreign Language & Linguistics",cat:"Fields of Study",note:"Language structure, culture & translation"},
-  {name:"History",cat:"Fields of Study"},
-  {name:"Film",cat:"Fields of Study"},
-  {name:"Animal Science",cat:"Fields of Study"},
-  {name:"English",cat:"Fields of Study"},
-  {name:"Environmental Science",cat:"Fields of Study"},
-  {name:"Chemistry",cat:"Fields of Study"},
-  {name:"Economics",cat:"Fields of Study"},
-  {name:"Culinary Arts",cat:"Fields of Study"},
-  {name:"Astronomy",cat:"Fields of Study"},
-  {name:"Math",cat:"Fields of Study"},
-  {name:"Political Science",cat:"Fields of Study"},
-  {name:"Music",cat:"Fields of Study"},
-  {name:"Nursing",cat:"Fields of Study"},
-  {name:"Hospitality Management",cat:"Fields of Study"},
-  {name:"Drama / Theater",cat:"Fields of Study"},
-  {name:"Construction Management",cat:"Fields of Study"},
-  {name:"Biology",cat:"Fields of Study"},
-  {name:"Neuroscience",cat:"Fields of Study"},
-  {name:"Computer Science",cat:"Fields of Study"},
-  {name:"Agriculture & Sustainability",cat:"Fields of Study"},
-  {name:"Ethnic & Cultural Studies",cat:"Fields of Study",note:"Race, ethnicity & cultural identity studies"},
-  {name:"Military Studies",cat:"Fields of Study"},
-  {name:"Art",cat:"Fields of Study"},
-  {name:"Architecture",cat:"Fields of Study"},
-  {name:"Pre-Law",cat:"Fields of Study",note:"A track for students planning law school"},
-  {name:"Pre-Med / Health Sciences",cat:"Fields of Study"},
-  {name:"Graphic Design / UX Design",cat:"Fields of Study",note:"Visual & digital design for apps, websites & products"},
-  {name:"Veterinary Science / Pre-Vet",cat:"Fields of Study",note:"Animal medicine & veterinary career path"},
 
   // LOCATION (9 — unchanged)
   {name:"Rocky Mountains",cat:"Location & Setting",note:"Colorado, Idaho, Montana, Utah, Wyoming"},
@@ -647,9 +729,11 @@ const ALL_CARDS=[
   {name:"Snow",cat:"Location & Setting"},
   {name:"Warm Weather",cat:"Location & Setting"},
   {name:"Residential Campus",cat:"Location & Setting",note:"Most students live on campus the first 1-2 years"},
-  {name:"Small College",cat:"Location & Setting"},
-  {name:"Medium Sized College",cat:"Location & Setting"},
-  {name:"Large College",cat:"Location & Setting"},
+  {name:"Small College",cat:"Location & Setting",note:"Under 3,000 undergraduates"},
+  {name:"Medium Sized College",cat:"Location & Setting",note:"3,000 to 15,000 undergraduates"},
+  {name:"Large College",cat:"Location & Setting",note:"Over 15,000 undergraduates"},
+  {name:"Private University",cat:"Location & Setting",note:"Independently funded, not state-run"},
+  {name:"Public / State University",cat:"Location & Setting",note:"State-funded, often cheaper in-state"},
 
   // ACTIVITIES & INVOLVEMENT (11 — added Required Internships, renamed Cultural Events)
   {name:"Campus Events",cat:"Activities & Involvement",note:"Concerts, art shows, guest speakers & festivals"},
@@ -718,7 +802,7 @@ const ALL_CARDS=[
 let cards=[],idx=0,placements={},counts={1:0,2:0,3:0,4:0,5:0};
 let toastTimer=null, toastShown=false;
 
-const SECTION_ORDER=["Fields of Study","Location & Setting","Resources & Support","Learning Environment","Campus Culture","Activities & Involvement","Identity & Community"];
+const SECTION_ORDER=["Location & Setting","Resources & Support","Learning Environment","Campus Culture","Activities & Involvement","Identity & Community"];
 let sectionStart={}, sectionCount={};
 function buildDeck(){
   const byCat={};
@@ -734,7 +818,7 @@ function buildDeck(){
 
 function init(){
   buildDeck();
-  document.getElementById('totalCount').textContent=`${cards.length} cards across 7 categories`;
+  document.getElementById('totalCount').textContent=`${cards.length} cards across ${SECTION_ORDER.length} categories`;
 }
 
 function showScreen(id){
@@ -767,7 +851,7 @@ function updateSectionProgress(cat){
   const secIdx=SECTION_ORDER.indexOf(cat);
   const within=idx-(sectionStart[cat]||0)+1;
   const total=sectionCount[cat]||0;
-  document.getElementById('pLabel').textContent=`${cat} · ${within} of ${total}`;
+  document.getElementById('pLabel').textContent=`${cat} · ${within} of ${total} · Card ${idx+1}/${cards.length}`;
   document.querySelectorAll('#sectionBar .seg').forEach((seg,i)=>{
     if(i<secIdx){seg.style.background='var(--c1)';seg.style.opacity='1';}
     else if(i===secIdx){seg.style.background='var(--c1)';seg.style.opacity='.5';}
@@ -784,7 +868,12 @@ function showToast(msg){
 }
 
 // ── PLACEMENT ─────────────────────────────────────────────────
+const MUST_HAVE_CAP = 12;
 function placeCard(cat){
+  if(cat===5 && counts[5]>=MUST_HAVE_CAP){
+    showToast(`You've hit your limit of ${MUST_HAVE_CAP} Must Haves. Remove one to add another.`);
+    return;
+  }
   placements[idx]=cat;
   counts[cat]++;
   const el=document.getElementById('mainCard');
@@ -910,7 +999,8 @@ async function callBackend(){
         dontLike:dontLike,
         mustHaveByCategory:mustByCat,
         wouldLikeByCategory:likeByCat,
-        studentProfile:intakeData
+        studentProfile:intakeData,
+        categoryRank:categoryRankOrder
       })
     });
     if(!res.ok)throw new Error(`Server error: ${res.status}`);
@@ -941,7 +1031,7 @@ function showResults(schools,must,like,error,topCats){
     must.map(p=>`<div class="pill pill-must">★ ${p}</div>`).join('');
   const list=document.getElementById('schoolsList');
   if(error||!schools){
-    list.innerHTML=`<div class="err-box"><strong>Could not load AI recommendations.</strong><br>Please ensure your API key is configured in Vercel environment variables.<br><br><small style="opacity:.55">${error||'Unknown error'}</small></div>`;
+    list.innerHTML=`<div class="err-box"><strong>Could not load your matches.</strong><br>Something went wrong reaching our matching service.<br><br><button class="btn-sec" onclick="retryMatch()">RETRY</button><br><br><small style="opacity:.55">${error||'Unknown error'}</small></div>`;
     return;
   }
   const fitColor=pct=>pct>=80?'#2a9d5c':pct>=65?'#2d5be3':pct>=50?'#e07b2a':'#c8453a';
@@ -965,6 +1055,14 @@ function showResults(schools,must,like,error,topCats){
     </div>`).join('');
   requestAnimationFrame(()=>setTimeout(()=>
     document.querySelectorAll('.s-bar').forEach(b=>b.style.width=b.dataset.pct+'%'),120));
+}
+
+function retryMatch(){
+  showScreen('loading');
+  document.querySelectorAll('.load-step').forEach(s=>s.classList.remove('done'));
+  const steps=['ls1','ls2','ls3','ls4','ls5','ls6','ls7','ls8'];
+  steps.forEach((id,i)=>setTimeout(()=>document.getElementById(id).classList.add('done'),(i*300)+200));
+  setTimeout(callBackend,600);
 }
 
 // ── SHARE ────────────────────────────────────────────────────
@@ -1019,7 +1117,7 @@ function retakeSort(){
 function resetApp(){
   counts={1:0,2:0,3:0,4:0,5:0};
   placements={};idx=0;toastShown=false;
-  intakeData={location:'',gpa:'',testType:'',testScore:'',budget:'',major:'',grade:'',income:''};
+  intakeData={location:'',gpa:'',gpaScale:'',testType:'',testScore:'',budget:'',major:'',grade:'',income:''};
   buildDeck();
   document.querySelectorAll('.load-step').forEach(s=>s.classList.remove('done'));
   document.getElementById('q1').value='';
@@ -1033,7 +1131,12 @@ function resetApp(){
   document.getElementById('qIncome').value='';
   document.getElementById('gradeLabel').textContent='6. What grade in high school are you?';
   document.getElementById('q5').value='';
+  document.getElementById('q5-other').value='';
+  document.getElementById('q5-other').style.display='none';
   document.querySelectorAll('#q6group .intake-btn').forEach(b=>b.classList.remove('selected'));
+  document.querySelectorAll('#q2scale .intake-btn').forEach(b=>b.classList.remove('selected'));
+  categoryRankOrder=[];
+  clearIntakeErrors();
   showScreen('splash');
 }
 
