@@ -4,17 +4,25 @@
 // dependency needed, called with plain fetch() to match match.js's existing
 // zero-dependency style).
 //
-// Graceful by design: if SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY aren't set
-// yet, this responds 200 (so the frontend, which fire-and-forgets this call,
-// never breaks) but logs a passive warning so Luka can see in Vercel logs that
+// Graceful by design: if SUPABASE_URL / SUPABASE_SECRET_KEY aren't set yet,
+// this responds 200 (so the frontend, which fire-and-forgets this call, never
+// breaks) but logs a passive warning so Luka can see in Vercel logs that
 // feedback is being dropped until the env vars are added.
 //
 // Setup (once): create a Supabase project, run the SQL in
 // supabase-feedback-schema.sql (handed off alongside this file) in the SQL
-// editor, then add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY as Vercel env
-// vars (Project Settings → API in Supabase for both values). Uses the SERVICE
-// ROLE key deliberately — this endpoint runs server-side only and is never
-// exposed to the browser, so it can bypass Row Level Security safely.
+// editor, then add SUPABASE_URL and SUPABASE_SECRET_KEY as Vercel env vars
+// (Project Settings → API Keys in Supabase — Project URL + the "Secret keys"
+// value; NOT the Publishable key). Uses the secret key deliberately — this
+// endpoint runs server-side only and is never exposed to the browser, so it
+// can bypass Row Level Security safely.
+//
+// IMPORTANT — Supabase's current (2026) key format: the new sb_secret_...
+// key is sent ONLY in the `apikey` header. Unlike the older JWT-based
+// service_role key, it must NOT also be sent as `Authorization: Bearer ...`
+// — Supabase's own docs confirm a non-JWT key in that header gets rejected
+// once it reaches Postgres. If a legacy JWT service_role key is used instead,
+// apikey-only still works fine, so this stays correct either way.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -32,9 +40,9 @@ export default async function handler(req, res) {
     }
 
     const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const secretKey = process.env.SUPABASE_SECRET_KEY;
 
-    if (!supabaseUrl || !serviceKey) {
+    if (!supabaseUrl || !secretKey) {
       // No-op so the frontend never sees an error — but log it, since silently
       // dropping real feedback data is exactly the kind of thing Luka needs to
       // be able to notice (mirrors the passive match_success/match_error log
@@ -62,8 +70,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
+        apikey: secretKey,
         Prefer: 'return=minimal',
       },
       body: JSON.stringify(row),
