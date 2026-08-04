@@ -183,6 +183,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .s-pct-num{font-family:'Bebas Neue',sans-serif;font-size:46px;line-height:1}
 .s-pct-lbl{font-size:10px;color:var(--muted);letter-spacing:1.5px}
 .s-why{padding:0 24px 18px;font-size:13px;color:var(--muted);line-height:1.7;border-top:1px solid var(--rule);padding-top:14px}
+.fit-question{font-size:14px;color:var(--muted);margin:-6px 0 16px;line-height:1.5}
+.s-card{cursor:pointer}
+.s-feedback{display:flex;flex-direction:column;gap:6px;align-items:center;margin-left:4px}
+.s-feedback-lbl{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:1px;white-space:nowrap}
+.fit-btn{width:36px;height:28px;border-radius:7px;border:1.5px solid var(--rule);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;color:var(--muted);letter-spacing:.5px}
+.fit-btn:hover{border-color:var(--ink);color:var(--ink)}
+.fit-btn.yes.selected{background:var(--c5);border-color:var(--c5);color:#fff}
+.fit-btn.no.selected{background:var(--c1);border-color:var(--c1);color:#fff}
+#schoolDetailOverlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px}
+#schoolDetailOverlay.active{display:flex}
+.detail-card{background:var(--surface);border-radius:20px;padding:32px 28px 28px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;position:relative}
+.detail-close{position:absolute;top:16px;right:18px;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;padding:4px}
+.detail-close:hover{color:var(--ink)}
+.detail-rank{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
+.detail-name{font-family:'Bebas Neue',sans-serif;font-size:32px;line-height:1.05;color:var(--ink);margin-bottom:4px;padding-right:24px}
+.detail-loc{font-size:13px;color:var(--muted);margin-bottom:12px}
+.detail-badge{display:none;padding:3px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;color:#fff;margin-bottom:20px}
+.detail-stats{display:flex;gap:10px;margin-bottom:24px;padding:18px;background:var(--bg);border-radius:14px;border:1.5px solid var(--rule)}
+.detail-stat{flex:1;text-align:center}
+.detail-stat-lbl{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.detail-stat-val{font-family:'Bebas Neue',sans-serif;font-size:17px;color:var(--ink);line-height:1.15}
+.detail-why-label{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:10px}
+.detail-why{font-size:14px;color:var(--ink);line-height:1.7}
 .res-actions{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
 .btn-sec{flex:1;min-width:150px;padding:16px 20px;border-radius:8px;border:2px solid var(--ink);background:transparent;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;cursor:pointer;transition:all .2s;color:var(--ink)}
 .btn-sec:hover{background:var(--ink);color:var(--bg)}
@@ -511,6 +534,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
     <div class="sec-label">Your Must-Haves</div>
     <div class="pills" id="pills"></div>
     <div class="sec-label">Your Matched Schools</div>
+    <div class="fit-question">Do you think each of these schools would be a good fit for you?</div>
     <div class="schools" id="schoolsList"></div>
     <div class="res-actions">
       <button class="btn-sec" onclick="resetApp()">START OVER</button>
@@ -1034,9 +1058,12 @@ function showResults(schools,must,like,error,topCats){
     list.innerHTML=`<div class="err-box"><strong>Could not load your matches.</strong><br>Something went wrong reaching our matching service.<br><br><button class="btn-sec" onclick="retryMatch()">RETRY</button><br><br><small style="opacity:.55">${error||'Unknown error'}</small></div>`;
     return;
   }
+  // One ID per completed match, shared by every yes/no feedback row this results
+  // screen sends — lets the backend group all responses to one match together.
+  _matchId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('m'+Date.now()+Math.random().toString(36).slice(2));
   const fitColor=pct=>pct>=80?'#2a9d5c':pct>=65?'#2d5be3':pct>=50?'#e07b2a':'#c8453a';
   list.innerHTML=schools.map((s,i)=>`
-    <div class="s-card">
+    <div class="s-card" onclick="openSchoolDetail(${i})">
       <div class="s-bar-wrap"><div class="s-bar" style="width:0%;background:${fitColor(s.fitPercent)}" data-pct="${s.fitPercent}"></div></div>
       <div class="s-inner">
         <div class="s-rank">${String(i+1).padStart(2,'0')}</div>
@@ -1050,11 +1077,61 @@ function showResults(schools,must,like,error,topCats){
           <div class="s-pct-num" style="color:${fitColor(s.fitPercent)}">${s.fitPercent}%</div>
           <div class="s-pct-lbl">FIT SCORE</div>
         </div>
+        <div class="s-feedback">
+          <div class="s-feedback-lbl">Good fit?</div>
+          <button class="fit-btn yes" id="fitYes${i}" onclick="recordFit(event,${i},'yes')">YES</button>
+          <button class="fit-btn no" id="fitNo${i}" onclick="recordFit(event,${i},'no')">NO</button>
+        </div>
       </div>
-      <div class="s-why">${s.why}</div>
     </div>`).join('');
   requestAnimationFrame(()=>setTimeout(()=>
     document.querySelectorAll('.s-bar').forEach(b=>b.style.width=b.dataset.pct+'%'),120));
+}
+
+// ── SCHOOL DETAIL (tap a card) ──────────────────────────────────
+function openSchoolDetail(i){
+  const s=_sharedSchools[i]; if(!s) return;
+  const tags=Array.isArray(s.tags)?s.tags:[];
+  document.getElementById('detailRank').textContent=`#${i+1} MATCH`;
+  document.getElementById('detailName').textContent=s.name;
+  document.getElementById('detailLoc').textContent='📍 '+s.location;
+  const badge=document.getElementById('detailBadge');
+  if(s.admissibility){
+    badge.textContent=s.admissibility.toUpperCase();
+    badge.style.background=s.admissibility==='Likely'?'#2a9d5c':s.admissibility==='Reach'?'#c8453a':'#2d5be3';
+    badge.style.display='inline-block';
+  } else { badge.style.display='none'; }
+  document.getElementById('detailPrice').textContent=tags[0]||'—';
+  document.getElementById('detailSize').textContent=tags[1]||'—';
+  document.getElementById('detailAdmit').textContent=tags[3]||s.admissibility||'—';
+  document.getElementById('detailWhy').textContent=s.why||'No explanation available.';
+  document.getElementById('schoolDetailOverlay').classList.add('active');
+}
+
+function closeSchoolDetail(){
+  document.getElementById('schoolDetailOverlay').classList.remove('active');
+}
+
+// ── FIT FEEDBACK (yes/no per school, stored server-side) ────────
+function recordFit(evt,i,response){
+  evt.stopPropagation(); // don't also open the detail overlay
+  const s=_sharedSchools[i]; if(!s) return;
+  document.getElementById('fitYes'+i).classList.toggle('selected',response==='yes');
+  document.getElementById('fitNo'+i).classList.toggle('selected',response==='no');
+  fetch('/api/feedback',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      matchId:_matchId,
+      schoolName:s.name,
+      schoolLocation:s.location,
+      fitPercent:s.fitPercent,
+      admissibility:s.admissibility,
+      response,
+      studentProfile:intakeData,
+      categoryRank:categoryRankOrder
+    })
+  }).catch(()=>{}); // best-effort — never block the UI on a logging failure
 }
 
 function retryMatch(){
@@ -1067,6 +1144,7 @@ function retryMatch(){
 
 // ── SHARE ────────────────────────────────────────────────────
 let _sharedSchools=[];
+let _matchId=null;
 
 function shareResults(){
   // Build top 5 list
@@ -1117,6 +1195,8 @@ function retakeSort(){
 function resetApp(){
   counts={1:0,2:0,3:0,4:0,5:0};
   placements={};idx=0;toastShown=false;
+  _matchId=null;
+  closeSchoolDetail();
   intakeData={location:'',gpa:'',gpaScale:'',testType:'',testScore:'',budget:'',major:'',grade:'',income:''};
   buildDeck();
   document.querySelectorAll('.load-step').forEach(s=>s.classList.remove('done'));
@@ -1142,6 +1222,24 @@ function resetApp(){
 
 init();
 </script>
+
+<!-- SCHOOL DETAIL OVERLAY -->
+<div id="schoolDetailOverlay">
+  <div class="detail-card">
+    <button class="detail-close" onclick="closeSchoolDetail()">✕</button>
+    <div class="detail-rank" id="detailRank"></div>
+    <div class="detail-name" id="detailName"></div>
+    <div class="detail-loc" id="detailLoc"></div>
+    <div class="detail-badge" id="detailBadge"></div>
+    <div class="detail-stats">
+      <div class="detail-stat"><div class="detail-stat-lbl">Size</div><div class="detail-stat-val" id="detailSize"></div></div>
+      <div class="detail-stat"><div class="detail-stat-lbl">Price</div><div class="detail-stat-val" id="detailPrice"></div></div>
+      <div class="detail-stat"><div class="detail-stat-lbl">Admissibility</div><div class="detail-stat-val" id="detailAdmit"></div></div>
+    </div>
+    <div class="detail-why-label">Why This Is A Match</div>
+    <div class="detail-why" id="detailWhy"></div>
+  </div>
+</div>
 
 <!-- SHARE OVERLAY -->
 <div id="shareOverlay">
