@@ -416,7 +416,7 @@ function sanitizeSchools(schools) {
 
 const SCORECARD_FIELDS = [
   'id',
-  'school.name', 'school.city', 'school.state',
+  'school.name', 'school.city', 'school.state', 'school.ownership',
   'latest.student.size',
   'latest.admissions.admission_rate.overall',
   'latest.admissions.sat_scores.25th_percentile.overall',
@@ -464,7 +464,13 @@ async function enrichWithScorecard(schools, profile, needsAid) {
     const admitPct = data.admitRate != null ? Math.round(data.admitRate * 100) : null;
     const net = pickNetPrice(data, needsAid, profile && profile.income);
     const sticker = pickStickerTuition(data, studentPostal);
-    const admissibility = classifyAdmissibility(student, data) || s.admissibility;
+    const baseAdmissibility = classifyAdmissibility(student, data) || s.admissibility;
+
+    // In-state advantage: ported from Griffin's next4-platform design (2026-08-02).
+    // Evidence-gated one-step label bump for public in-state schools — never
+    // touches fitPercent/ranking, labels only.
+    const advantage = inStateAdvantage(data, studentPostal, student);
+    const admissibility = advantage.bump ? bumpAdmissibility(baseAdmissibility) : baseAdmissibility;
 
     // Rebuild the self-labeled tag array with verified numbers. tags[2] (program
     // strength) stays from the model — Scorecard has no program-quality metric.
@@ -480,6 +486,7 @@ async function enrichWithScorecard(schools, profile, needsAid) {
       sizeCat ? `${sizeCat} · ${size.toLocaleString()} ugrad` : (s.tags[1] || ''),
       s.tags[2] || '',
       admitPct != null ? `${admissibility} · ${admitPct}% admit` : `${admissibility}`,
+      advantage.eligible ? 'In-state · better odds' : '',
     ].filter(Boolean);
 
     return { ...s, admissibility, tags, verified: true };
@@ -516,9 +523,12 @@ async function fetchScorecard(school, apiKey) {
   const lower = name.toLowerCase();
   const row = rows.find((x) => String(x['school.name'] || '').toLowerCase() === lower) || rows[0];
 
+  const ownership = numOrNull(row['school.ownership']);
   return {
     unitid: numOrNull(row['id']),
     state: String(row['school.state'] || '').trim().toUpperCase(),
+    // 1 = Public, 2 = Private nonprofit, 3 = Private for-profit (Scorecard data dictionary).
+    control: ownership === 1 ? 'public' : (ownership === 2 || ownership === 3) ? 'private' : null,
     size: numOrNull(row['latest.student.size']),
     admitRate: numOrNull(row['latest.admissions.admission_rate.overall']),
     sat25: numOrNull(row['latest.admissions.sat_scores.25th_percentile.overall']),
@@ -571,6 +581,47 @@ function classifyAdmissibility(student, d) {
   if (student.score >= p75) return 'Likely';
   if (student.score >= p25) return 'Target';
   return 'Reach';
+}
+
+// ============================================================================
+// IN-STATE ADVANTAGE  (ported from Griffin's next4-platform design, 2026-08-02)
+// ----------------------------------------------------------------------------
+// A public university in the student's home state gives a real admissions
+// edge. But a true in-state acceptance rate does not exist in any free source
+// (IPEDS/Scorecard never split admit rate by residency), so this must never
+// invent a rate. Instead it's an evidence-gated ONE-STEP LABEL BUMP:
+//   - Eligibility: school is public AND school.state === student's home state.
+//   - Rule 1: admitRate < 20% -> never bump (sub-20% is a Reach for everyone,
+//     residents included; this must not punch through the hard selectivity gate).
+//   - Rule 2: admitRate >= 50% -> bump one step (generous enough that
+//     residency plausibly tips a borderline case).
+//   - Rule 3: student's score is within 5% of the school's own 25th-percentile
+//     admit for their test type -> bump one step.
+//   - Otherwise: eligible for the "In-state" note, but no bump — most public
+//     schools land here, especially ones (like many California publics) that
+//     report no test percentiles at all. A rule that bumped on missing data
+//     would wrongly promote every school with null percentiles.
+// One step only: Reach -> Target, Target -> Likely. Likely never bumps further.
+// Labels only — this must never affect fitPercent or which schools get picked;
+// see bumpAdmissibility() below and its single call site in enrichWithScorecard.
+// ============================================================================
+function inStateAdvantage(d, studentPostal, student) {
+  const eligible = d.control === 'public' && !!studentPostal && d.state === studentPostal;
+  if (!eligible) return { eligible: false, bump: false };
+
+  if (d.admitRate != null && d.admitRate < 0.20) return { eligible: true, bump: false };
+  if (d.admitRate != null && d.admitRate >= 0.50) return { eligible: true, bump: true };
+  if (student) {
+    const p25 = student.kind === 'SAT' ? d.sat25 : d.act25;
+    if (p25 != null && student.score >= p25 * 0.95) return { eligible: true, bump: true };
+  }
+  return { eligible: true, bump: false };
+}
+
+function bumpAdmissibility(label) {
+  if (label === 'Reach') return 'Target';
+  if (label === 'Target') return 'Likely';
+  return label; // 'Likely' stays 'Likely'
 }
 
 // Map the intake income bands (20k bands) to Scorecard's net-price income brackets.
