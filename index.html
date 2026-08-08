@@ -209,10 +209,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .detail-name{font-family:'Bebas Neue',sans-serif;font-size:32px;line-height:1.05;color:var(--ink);margin-bottom:4px;padding-right:24px}
 .detail-loc{font-size:13px;color:var(--muted);margin-bottom:12px}
 .detail-badge{display:none;padding:3px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;color:#fff;margin-bottom:20px}
-.detail-stats{display:flex;gap:10px;margin-bottom:24px;padding:18px;background:var(--bg);border-radius:14px;border:1.5px solid var(--rule)}
-.detail-stat{flex:1;text-align:center}
-.detail-stat-lbl{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
-.detail-stat-val{font-family:'Bebas Neue',sans-serif;font-size:17px;color:var(--ink);line-height:1.15}
+.detail-stats{display:flex;flex-direction:column;margin-bottom:24px;padding:4px 18px;background:var(--bg);border-radius:14px;border:1.5px solid var(--rule)}
+.detail-stat{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0}
+.detail-stat:not(:last-child){border-bottom:1px solid var(--rule)}
+.detail-stat-lbl{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;flex-shrink:0}
+.detail-stat-val{font-family:'Bebas Neue',sans-serif;font-size:19px;color:var(--ink);line-height:1.15;text-align:right}
 .detail-why-label{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:10px}
 .detail-why{font-size:14px;color:var(--ink);line-height:1.7}
 .res-actions{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
@@ -1168,6 +1169,15 @@ async function callBackend(){
 }
 
 // ── RESULTS ──────────────────────────────────────────────────
+// The backend now returns up to 15 ranked matches. Only the first 10 are
+// shown at once (VISIBLE_COUNT) — the remaining 5 sit in reserve. If a
+// student marks a shown school "not helpful," that slot is repopulated in
+// place with the next unused school from the 15-school pool, so the visible
+// list always tries to stay at 10 real options for as long as the pool lasts.
+const VISIBLE_COUNT = 10;
+let _visible=[];     // indices into _sharedSchools currently shown, one per on-screen slot
+let _nextPoolIdx=0;  // pointer to the next not-yet-shown school in _sharedSchools
+
 function showResults(schools,must,like,error,topCats){
   showScreen('results');
   _sharedSchools=schools||[];
@@ -1189,38 +1199,59 @@ function showResults(schools,must,like,error,topCats){
   // One ID per completed match, shared by every yes/no feedback row this results
   // screen sends — lets the backend group all responses to one match together.
   _matchId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('m'+Date.now()+Math.random().toString(36).slice(2));
-  const fitColor=pct=>pct>=80?'#2a9d5c':pct>=65?'#2d5be3':pct>=50?'#e07b2a':'#c8453a';
-  list.innerHTML=schools.map((s,i)=>`
-    <div class="s-card" onclick="openSchoolDetail(${i})">
-      <div class="s-bar-wrap"><div class="s-bar" style="width:0%;background:${fitColor(s.fitPercent)}" data-pct="${s.fitPercent}"></div></div>
-      <div class="s-inner">
-        <div class="s-rank">${String(i+1).padStart(2,'0')}</div>
-        <div class="s-info">
-          <div class="s-name">${s.name}</div>
-          <div class="s-loc">📍 ${s.location}</div>
-          ${s.admissibility?`<span class="s-adm" style="display:inline-block;margin-top:6px;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;color:#fff;background:${s.admissibility==='Likely'?'#2a9d5c':s.admissibility==='Reach'?'#c8453a':'#2d5be3'}">${s.admissibility.toUpperCase()}</span>`:''}
-          <div class="s-tags">${(Array.isArray(s.tags)?s.tags:(s.tags&&typeof s.tags==='object'?Object.values(s.tags):[])).filter(Boolean).map(t=>`<span class="s-tag">${t}</span>`).join('')}</div>
-        </div>
-        <div class="s-pct">
-          <div class="s-pct-num" style="color:${fitColor(s.fitPercent)}">${s.fitPercent}%</div>
-          <div class="s-pct-lbl">FIT SCORE</div>
-        </div>
-        <div class="s-feedback">
-          <div class="s-feedback-lbl">Good fit?</div>
-          <button class="fit-btn yes" id="fitYes${i}" onclick="recordFit(event,${i},'yes')">YES</button>
-          <button class="fit-btn no" id="fitNo${i}" onclick="recordFit(event,${i},'no')">NO</button>
-        </div>
+  _visible = schools.slice(0, VISIBLE_COUNT).map((_,i)=>i);
+  _nextPoolIdx = _visible.length;
+  renderSchoolsList();
+}
+
+function fitColor(pct){ return pct>=80?'#2a9d5c':pct>=65?'#2d5be3':pct>=50?'#e07b2a':'#c8453a'; }
+
+// Builds the inner HTML for one school card given its position on screen
+// (pos, 0-based, drives the rank number + element IDs) and which school from
+// the full pool currently occupies that slot (schoolIdx, into _sharedSchools).
+function schoolCardInnerHtml(schoolIdx,pos){
+  const s=_sharedSchools[schoolIdx]; if(!s) return '';
+  return `
+    <div class="s-bar-wrap"><div class="s-bar" style="width:0%;background:${fitColor(s.fitPercent)}" data-pct="${s.fitPercent}"></div></div>
+    <div class="s-inner">
+      <div class="s-rank">${String(pos+1).padStart(2,'0')}</div>
+      <div class="s-info">
+        <div class="s-name">${s.name}</div>
+        <div class="s-loc">📍 ${s.location}</div>
+        ${s.admissibility?`<span class="s-adm" style="display:inline-block;margin-top:6px;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;color:#fff;background:${s.admissibility==='Likely'?'#2a9d5c':s.admissibility==='Reach'?'#c8453a':'#2d5be3'}">${s.admissibility.toUpperCase()}</span>`:''}
+        <div class="s-tags">${(Array.isArray(s.tags)?s.tags:(s.tags&&typeof s.tags==='object'?Object.values(s.tags):[])).filter(Boolean).map(t=>`<span class="s-tag">${t}</span>`).join('')}</div>
       </div>
-    </div>`).join('');
+      <div class="s-pct">
+        <div class="s-pct-num" style="color:${fitColor(s.fitPercent)}">${s.fitPercent}%</div>
+        <div class="s-pct-lbl">FIT SCORE</div>
+      </div>
+      <div class="s-feedback">
+        <div class="s-feedback-lbl">Good fit?</div>
+        <button class="fit-btn yes" id="fitYes${pos}" onclick="recordFit(event,${pos},'yes')">YES</button>
+        <button class="fit-btn no" id="fitNo${pos}" onclick="recordFit(event,${pos},'no')">NO</button>
+      </div>
+    </div>`;
+}
+
+function renderSchoolsList(){
+  const list=document.getElementById('schoolsList');
+  list.innerHTML=_visible.map((schoolIdx,pos)=>
+    `<div class="s-card" id="sCard${pos}" onclick="openSchoolDetail(${pos})">${schoolCardInnerHtml(schoolIdx,pos)}</div>`
+  ).join('');
+  animateBars();
+}
+
+function animateBars(){
   requestAnimationFrame(()=>setTimeout(()=>
     document.querySelectorAll('.s-bar').forEach(b=>b.style.width=b.dataset.pct+'%'),120));
 }
 
 // ── SCHOOL DETAIL (tap a card) ──────────────────────────────────
-function openSchoolDetail(i){
-  const s=_sharedSchools[i]; if(!s) return;
+function openSchoolDetail(pos){
+  const schoolIdx=_visible[pos];
+  const s=_sharedSchools[schoolIdx]; if(!s) return;
   const tags=Array.isArray(s.tags)?s.tags:[];
-  document.getElementById('detailRank').textContent=`#${i+1} MATCH`;
+  document.getElementById('detailRank').textContent=`#${pos+1} MATCH`;
   document.getElementById('detailName').textContent=s.name;
   document.getElementById('detailLoc').textContent='📍 '+s.location;
   const badge=document.getElementById('detailBadge');
@@ -1241,11 +1272,15 @@ function closeSchoolDetail(){
 }
 
 // ── FIT FEEDBACK (yes/no per school, stored server-side) ────────
-function recordFit(evt,i,response){
+// On "No," the slot is repopulated with the next unused school from the
+// 15-school pool (if any remain), so the visible list keeps refreshing
+// itself toward schools the student hasn't rejected yet.
+function recordFit(evt,pos,response){
   evt.stopPropagation(); // don't also open the detail overlay
-  const s=_sharedSchools[i]; if(!s) return;
-  document.getElementById('fitYes'+i).classList.toggle('selected',response==='yes');
-  document.getElementById('fitNo'+i).classList.toggle('selected',response==='no');
+  const schoolIdx=_visible[pos];
+  const s=_sharedSchools[schoolIdx]; if(!s) return;
+  document.getElementById('fitYes'+pos).classList.toggle('selected',response==='yes');
+  document.getElementById('fitNo'+pos).classList.toggle('selected',response==='no');
   fetch('/api/feedback',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -1260,6 +1295,17 @@ function recordFit(evt,i,response){
       categoryRank:categoryRankOrder
     })
   }).catch(()=>{}); // best-effort — never block the UI on a logging failure
+
+  if(response==='no' && _nextPoolIdx<_sharedSchools.length){
+    _visible[pos]=_nextPoolIdx;
+    _nextPoolIdx++;
+    const card=document.getElementById('sCard'+pos);
+    if(card){
+      card.innerHTML=schoolCardInnerHtml(_visible[pos],pos);
+      const bar=card.querySelector('.s-bar');
+      if(bar) requestAnimationFrame(()=>setTimeout(()=>{ bar.style.width=bar.dataset.pct+'%'; },50));
+    }
+  }
 }
 
 function retryMatch(){
@@ -1275,9 +1321,10 @@ let _sharedSchools=[];
 let _matchId=null;
 
 function shareResults(){
-  // Build top 5 list
-  const top5=(_sharedSchools||[]).slice(0,5);
-  const fitColor=pct=>pct>=80?'#2a9d5c':pct>=65?'#2d5be3':pct>=50?'#e07b2a':'#c8453a';
+  // Build top 5 from what's currently VISIBLE (respects any "not helpful"
+  // swaps), not just the raw backend order — this is what the student has
+  // actually been looking at.
+  const top5=(_visible||[]).slice(0,5).map(idx=>_sharedSchools[idx]).filter(Boolean);
   document.getElementById('shareTop5').innerHTML=top5.map((s,i)=>`
     <div class="share-row">
       <div class="share-rank">${String(i+1).padStart(2,'0')}</div>
@@ -1324,6 +1371,8 @@ function resetApp(){
   counts={1:0,2:0,3:0,4:0,5:0};
   placements={};idx=0;toastShown=false;
   _matchId=null;
+  _visible=[];
+  _nextPoolIdx=0;
   closeSchoolDetail();
   intakeData={location:'',gpa:'',gpaScale:'',testType:'',testScore:'',budget:'',major:'',grade:'',income:''};
   buildDeck();
