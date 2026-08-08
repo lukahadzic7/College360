@@ -87,7 +87,7 @@ STUDENT PROFILE (use this to calibrate every recommendation):
 - Grade level: ${p.grade || 'Not specified'}
 - Financial-aid need detected: ${needsAid ? 'YES - evaluate affordability on NET price, not sticker price' : 'No explicit aid signal - use stated budget'}`;
 
-    const prompt = `You are an expert college counselor with encyclopedic, fact-based knowledge of US colleges and universities. A student has completed the Next4 preference card sort. Your job is to recommend their top 10 best-fit colleges with extreme precision and accuracy.
+    const prompt = `You are an expert college counselor with encyclopedic, fact-based knowledge of US colleges and universities. A student has completed the Next4 preference card sort. Your job is to recommend their top 15 best-fit colleges with extreme precision and accuracy.
 
 ${profileContext}
 
@@ -143,7 +143,7 @@ SEPARATELY, for EACH school you recommend, compare THIS student's interpreted GP
 - "Reach": student's stats are below the 25th percentile, OR the school's admit rate is under 20% (sub-20% schools are a Reach for everyone, regardless of stats).
 
 These two systems are INDEPENDENT. System A decides how high to aim; System B honestly labels each result. A top-tier student will still have Reach schools (e.g., sub-20% admit schools) and must also have at least one Likely. Never let the GPA tier override the honest per-school label.
-HARD REQUIREMENT: the final list of 8 MUST contain at least 1 "Likely" and at least 1 "Reach", and must NOT be entirely "Reach".
+HARD REQUIREMENT: the final list of 15 MUST contain at least 2 "Likely" and at least 2 "Reach", and must NOT be entirely "Reach".
 
 ==================================================================
 AFFORDABILITY - NET price when aid is needed, sticker otherwise
@@ -243,7 +243,7 @@ fitPercent is an honest integer 52-99 reflecting how well the school matches the
 - 52-59: included for range/diversity, with notable gaps
 Use the honest number. Do NOT artificially cap scores - if a school genuinely matches almost everything and is a realistic fit, a 95+ is correct. Reserve 90+ for schools that truly satisfy nearly all priorities.
 
-EXPLANATION: The "why" field must cite specific, verifiable, source-anchored facts tied to the student's profile AND preferences (GPA/admissibility fit, net-or-sticker cost fit, major strength, specific cultural/outcome cards). Never use generic phrases like "great academics."
+EXPLANATION: The "why" field must cite specific, verifiable, source-anchored facts tied to the student's profile AND preferences (GPA/admissibility fit, net-or-sticker cost fit, major strength, specific cultural/outcome cards). Never use generic phrases like "great academics." VOICE: write it as a direct, personal message TO the student — use "you" and "your" throughout (e.g. "Your GPA and test scores put you solidly in range here, and your interest in..."). NEVER refer to the student in the third person ("the student," "they," "their," "this student") — every sentence should read as if speaking directly to the person who will read it.
 
 SCHOOL DIVERSITY: Include a mix of -
 - At least 2 nationally recognized universities
@@ -255,24 +255,24 @@ SCHOOL DIVERSITY: Include a mix of -
 OUTPUT FORMAT
 ==================================================================
 Return ONLY valid JSON - no markdown, no backticks, no preamble, no trailing commas.
-Return a JSON array of exactly 10 school objects, ordered by fitPercent descending. Each object:
+Return a JSON array of exactly 15 school objects, ordered by fitPercent descending. Each object:
 - "name": full official school name
 - "location": "City, ST" (e.g. "Ann Arbor, MI")
 - "fitPercent": honest integer 52-99
 - "admissibility": exactly one of "Likely" | "Target" | "Reach"
 - "tags": an OBJECT with exactly these four NAMED string fields (named so they can never render out of order):
     - "cost": affordability tier - for public schools, distinguish in-state vs out-of-state sticker for THIS student, and net price if aid-relevant (e.g. "In-state ~$13K/yr tuition (net ~$9K after aid)" or "Out-of-state ~$40K/yr tuition")
-    - "size": size category + approx undergrad enrollment (e.g. "Medium, ~9,400 ugrad")
+    - "size": size category + approx undergraduate enrollment (e.g. "Medium, ~9,400 undergraduates")
     - "program": key program strength tied to the student's major/priorities (e.g. "Top-20 ABET Engineering")
     - "fit": admissibility label + admit-rate context (e.g. "Target, ~38% admit")
-- "why": exactly 2 sentences. Sentence 1: 2-3 specific, source-anchored facts connecting the school to this student's profile and cards. Sentence 2: one honest caveat (note data-confidence if any figure is approximate). Do NOT put precise admit rates, net prices, test scores, or enrollment counts in the "why" — those exact figures appear in the tags; refer to them qualitatively here (e.g., "highly selective", "affordable after aid", "large public").
+- "why": exactly 2 sentences, written directly TO the student using "you"/"your" (never third person). Sentence 1: 2-3 specific, source-anchored facts connecting the school to your profile and cards. Sentence 2: one honest caveat (note data-confidence if any figure is approximate). Do NOT put precise admit rates, net prices, test scores, or enrollment counts in the "why" — those exact figures appear in the tags; refer to them qualitatively here (e.g., "highly selective", "affordable after aid", "large public").
 
 FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fails:
-1. Exactly 10 schools.
+1. Exactly 15 schools.
 2. Valid JSON: no markdown, no backticks, no trailing commas.
-3. Every object has name, location, fitPercent (integer 52-99), admissibility, tags{cost,size,program,fit}, and a 2-sentence why.
-4. At least 1 school is "Likely" and at least 1 is "Reach"; not all are "Reach".
-5. No more than 2 schools from the same state.
+3. Every object has name, location, fitPercent (integer 52-99), admissibility, tags{cost,size,program,fit}, and a 2-sentence why written in second person ("you"/"your").
+4. At least 2 schools are "Likely" and at least 2 are "Reach"; not all are "Reach".
+5. No more than 3 schools from the same state.
 6. Every MUST HAVE card is reflected in the recommended schools (schools that fail a MUST HAVE were excluded).
 7. Every numeric figure is source-anchored or explicitly hedged as approximate - no fabricated precise stats.
 8. For every public-school cost tag, in-state vs out-of-state is correctly distinguished for THIS student's home state.`;
@@ -295,7 +295,7 @@ FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fa
       }
     }
     if (!schools) {
-      schools = await callClaudeForJson(apiKey, 'claude-opus-4-5', prompt, 8000);
+      schools = await callClaudeForJson(apiKey, 'claude-opus-4-5', prompt, 11000);
     }
 
     schools = sanitizeSchools(schools);
@@ -333,7 +333,7 @@ function sanitizeSchools(schools) {
     throw new Error('Model did not return a JSON array of schools');
   }
 
-  const cleaned = schools.slice(0, 10).map((s) => {
+  const cleaned = schools.slice(0, 15).map((s) => {
     const obj = (s && typeof s === 'object') ? s : {};
 
     let fit = parseInt(obj.fitPercent, 10);
@@ -390,7 +390,7 @@ function sanitizeSchools(schools) {
 // ============================================================================
 // COLLEGE SCORECARD VERIFICATION  (the "Option B" accuracy layer)
 // ----------------------------------------------------------------------------
-// The model picks the 8 schools, but its numbers come from training memory and
+// The model picks the 15 schools, but its numbers come from training memory and
 // can be stale. This layer fetches REAL, current data from the U.S. Department
 // of Education's College Scorecard API for each picked school, then:
 //   1. overwrites the displayed cost / size / admit-rate tags with real figures
@@ -483,7 +483,7 @@ async function enrichWithScorecard(schools, profile, needsAid) {
 
     const tags = [
       costTag,
-      sizeCat ? `${sizeCat} · ${size.toLocaleString()} ugrad` : (s.tags[1] || ''),
+      sizeCat ? `${sizeCat} · ${size.toLocaleString()} undergraduates` : (s.tags[1] || ''),
       s.tags[2] || '',
       admitPct != null ? `${admissibility} · ${admitPct}% admit` : `${admissibility}`,
       advantage.eligible ? 'In-state · better odds' : '',
@@ -709,14 +709,14 @@ async function callClaudeForJson(apiKey, model, prompt, maxTokens) {
 async function runTwoPass(apiKey, p, needsAid, basePrompt, sort) {
   // Pass 1 — fast model proposes a candidate pool (names only).
   const candidates = await callClaudeForJson(apiKey, 'claude-haiku-4-5-20251001', buildCandidatePrompt(p, sort), 1500);
-  if (!Array.isArray(candidates) || candidates.length < 10) {
+  if (!Array.isArray(candidates) || candidates.length < 15) {
     throw new Error('Pass 1 returned too few candidates');
   }
-  const pool = candidates.slice(0, 18).map((c) => ({
+  const pool = candidates.slice(0, 26).map((c) => ({
     name: String((c && (c.name || c.school)) || '').trim(),
     location: [c && c.city, c && c.state].filter(Boolean).join(', '),
   })).filter((c) => c.name);
-  if (pool.length < 10) throw new Error('Pass 1 produced too few valid names');
+  if (pool.length < 15) throw new Error('Pass 1 produced too few valid names');
 
   // Attach REAL Scorecard data to every candidate (parallel).
   const datas = await Promise.allSettled(pool.map((c) => fetchScorecard(c, apiKey)));
@@ -736,16 +736,16 @@ async function runTwoPass(apiKey, p, needsAid, basePrompt, sort) {
     return `- ${c.name}${loc}: ${admit}${sat}${act}${size}${sticker ? ', ' + sticker.label.toLowerCase() + ' sticker ~$' + fmtK(sticker.value) + '/yr' : ''}${net ? ', net ~$' + fmtK(net.value) + '/yr' : ''}${cls ? ', looks ' + cls : ''}`;
   });
 
-  const poolText = 'VERIFIED CANDIDATE POOL (current College Scorecard data). Choose your final 10 FROM THIS POOL ONLY, using these REAL numbers for cost / size / admit rate / admissibility — do not substitute remembered figures. Sticker prices shown are already residency-correct for this specific student:\n'
+  const poolText = 'VERIFIED CANDIDATE POOL (current College Scorecard data). Choose your final 15 FROM THIS POOL ONLY, using these REAL numbers for cost / size / admit rate / admissibility — do not substitute remembered figures. Sticker prices shown are already residency-correct for this specific student:\n'
     + lines.join('\n') + '\n\n';
 
   // Pass 2 — strong model makes the final, data-driven selection.
-  return await callClaudeForJson(apiKey, 'claude-opus-4-5', poolText + basePrompt, 8000);
+  return await callClaudeForJson(apiKey, 'claude-opus-4-5', poolText + basePrompt, 11000);
 }
 
 // Compact prompt for the candidate-shortlist pass (names only).
 function buildCandidatePrompt(p, sort) {
-  return `You are a US college expert. A student is using the Next4 card-sort matcher. Propose ~16 REAL US colleges that plausibly fit, respecting the hard filters. Return ONLY a JSON array of objects { "name": "Full Official Name", "city": "City", "state": "ST" } — no prose, no markdown.
+  return `You are a US college expert. A student is using the Next4 card-sort matcher. Propose ~24 REAL US colleges that plausibly fit, respecting the hard filters. Return ONLY a JSON array of objects { "name": "Full Official Name", "city": "City", "state": "ST" } — no prose, no markdown.
 
 STUDENT: home state ${p.location || '?'}, GPA ${p.gpa || '?'}${p.gpaScale ? ' (' + p.gpaScale + ')' : ''}, test ${p.testType || '?'} ${p.testScore || ''}, budget ${p.budget || '?'}, major ${p.major || '?'}, grade ${p.grade || '?'}.
 MUST HAVE: ${(sort.mustHave || []).join(', ') || 'none'}
