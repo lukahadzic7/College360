@@ -23,15 +23,25 @@ export default async function handler(req, res) {
       console.warn(JSON.stringify({ event: 'must_have_over_cap', received: rawMustHave.length, ts: new Date().toISOString() }));
     }
 
-    // Detect whether the student signaled a need for financial aid anywhere in
-    // their card sort or profile. Drives net-price (vs sticker-price) evaluation.
-    const aidSignals = ['financial aid', 'need significant financial aid', 'needs significant financial aid', 'need-based aid', 'meets full need'];
-    const allCards = [...(mustHave || []), ...(wouldLike || [])].map(c => String(c).toLowerCase());
-    const budgetStr = String(p.budget || '').toLowerCase();
-    const needsAid =
-      allCards.some(c => aidSignals.some(s => c.includes(s))) ||
-      aidSignals.some(s => budgetStr.includes(s)) ||
-      budgetStr.includes('under $15') || budgetStr.includes('significant');
+    // Detect whether the student signaled a need for financial aid. Drives net-price
+    // (vs sticker-price) evaluation.
+    //
+    // REAL BUG FOUND AND FIXED (2026-08-12): this used to search for human-readable
+    // phrases like 'financial aid' and 'under $15' inside p.budget and the card-sort
+    // text. But intakeData.budget is set from the intake <select>'s raw HTML value
+    // (e.g. "need-aid", "under-15k"), never the visible option text — so those phrase
+    // checks never actually matched anything. The ONLY thing that ever triggered this
+    // was the old standalone "Financial Aid" card (its literal card text contains
+    // "financial aid"). That card has been removed from the deck (replaced by this
+    // automatic detection), so the phrase-matching path is now also removed as dead
+    // code — this checks the real intake value directly instead.
+    const needsAid = p.budget === 'need-aid' || p.budget === 'under-15k';
+
+    // Majors: intake now supports selecting up to 4 (was a single value). Accept
+    // either shape defensively (array = current frontend, string = any old cached
+    // client) so this never throws on a shape mismatch.
+    const majorList = Array.isArray(p.major) ? p.major.filter(Boolean) : (p.major ? [p.major] : []);
+    const majorDisplay = majorList.length ? majorList.join(', ') : 'Not specified';
 
     // Summarize how the student's MUST HAVE + WOULD LIKE cards distribute across
     // the 6 preference categories (Fields of Study now lives only in the intake
@@ -83,7 +93,7 @@ STUDENT PROFILE (use this to calibrate every recommendation):
 - GPA: ${gpaDisplay}
 - Standardized testing: ${p.testType || 'Not specified'}${p.testScore && p.testScore !== 'N/A' ? ` (Score: ${p.testScore})` : ''}
 - Annual budget: ${p.budget || 'Not specified'}
-- Intended major: ${p.major || 'Not specified'}
+- Intended major(s): ${majorDisplay}${majorList.length > 1 ? ' (multiple selected — treat as "any of these," not a single required field)' : ''}
 - Grade level: ${p.grade || 'Not specified'}
 - Financial-aid need detected: ${needsAid ? 'YES - evaluate affordability on NET price, not sticker price' : 'No explicit aid signal - use stated budget'}`;
 
@@ -161,9 +171,10 @@ ${needsAid
 If you observe that a high-sticker school would likely be far cheaper after aid for this student, still surface it and explain the net-price reality in the caveat.`}
 
 MAJOR PRIORITIZATION:
-- If a specific major is selected: only recommend schools genuinely strong in that field (anchor to accreditor + outcomes data).
+- One major selected: only recommend schools genuinely strong in that field (anchor to accreditor + outcomes data).
+- Multiple majors selected (up to 4): a school must be genuinely strong in AT LEAST ONE of the selected majors to qualify — do not require all of them at once. Prefer schools strong in more than one of the selected majors when a genuinely strong option exists, but never exclude a school that's an excellent fit for just one of the selections.
 - Engineering: only ABET-accredited programs. Business: only AACSB-accredited or strong undergrad business. Nursing: only CCNE/ACEN-accredited. Pre-Med: strong advising + documented med-school placement. Veterinary/Pre-Vet: strong animal science + pre-vet advising.
-- Undecided: prioritize schools with strong general academics and easy major exploration.
+- Undecided (no major selected): prioritize schools with strong general academics and easy major exploration.
 
 GRADE LEVEL CONTEXT:
 - Freshman/Sophomore: early exploration - wider variety to broaden horizons
@@ -221,6 +232,8 @@ SPECIALIZED CARD DATA RULES (newer cards - anchor each to a real source; if unve
 - Strong Internship Pipeline: prioritize documented internship participation + employer partnerships (NACE first-destination internship rates, co-op offices, named employer pipelines); distinct from internships built into the major.
 - State-of-the-Art Labs & Facilities: prioritize documented recent capital investment + high research/instructional expenditures in the STUDENT'S field (NSF HERD; recent construction); scope to their major, not generic "nice buildings".
 - Low Cost of Living Area: judge by the cost of living of the school's CITY/METRO (not its tuition), anchored to BEA Regional Price Parities (RPP) and HUD Fair Market Rents. "Low" = metro RPP below the national average (100) and below-median area rents. Do not credit a school in an expensive metro just because its tuition or net price is low.
+- Varsity Sports: an NCAA-affiliated varsity athletics program (Division I, II, III, or NAIA) satisfies this card. If the VERIFIED CANDIDATE POOL below marks a school "NCAA {division} varsity athletics", treat it as satisfied - this is real federal (EADA) data, not a guess. If a school isn't in the verified pool, anchor to your own documented knowledge of its athletics status; never assume varsity sports without evidence. Keep the "why" field qualitative here (e.g. "you'll have real varsity athletics to plug into") rather than naming the specific division, consistent with every other numeric figure staying out of "why".
+- Campus Safety: when the VERIFIED CANDIDATE POOL marks a school "top-quartile campus safety," its real, federally-reported on-campus liquor-law arrest-and-referral rate (Clery Act data, EADA/Clery source) ranks among the safest 25% of all tracked US institutions - treat that as satisfying this card when marked Must Have or Would Like. Never state raw incident counts, arrest numbers, or rates anywhere in the "why" field - describe it only qualitatively (e.g. "campus safety reporting here is notably strong"), since a raw number out of context can read scarier than it is. If a school isn't in the verified pool or has no Clery data, fall back to documented, source-anchored safety reputation rather than guessing.
 
 WEATHER: If Snow is Not For Me, never recommend schools in MN, WI, VT, ME, NH, ND, SD, MI, upstate NY. If Warm Weather is Must Have, only schools in FL, TX, AZ, CA, HI.
 
@@ -287,7 +300,7 @@ FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fa
     if (process.env.SCORECARD_API_KEY) {
       try {
         schools = await runTwoPass(apiKey, p, needsAid, prompt, {
-          mustHave, wouldLike, preferNot, dontLike, dimensionSection,
+          mustHave, wouldLike, preferNot, dontLike, dimensionSection, majorList,
         });
       } catch (e) {
         console.warn('Two-pass failed; falling back to single pass:', e && e.message);
@@ -295,7 +308,7 @@ FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fa
       }
     }
     if (!schools) {
-      schools = await callClaudeForJson(apiKey, 'claude-opus-4-5', prompt, 11000);
+      schools = await callClaudeForJson(apiKey, 'claude-opus-4-5', prompt, MAX_TOKENS_FINAL);
     }
 
     schools = sanitizeSchools(schools);
@@ -675,40 +688,161 @@ function fmtK(n) { return Math.round(n / 1000) + 'K'; }
 // falls back to the proven single-pass flow.
 // ============================================================================
 
-// Fetch + robustly parse a JSON array from one Claude call.
-async function callClaudeForJson(apiKey, model, prompt, maxTokens) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error('Anthropic ' + response.status + ': ' + JSON.stringify(err));
-  }
-  const data = await response.json();
-  let text = (data.content || []).map(b => b.text || '').join('');
-  text = text.replace(/```json|```/g, '').trim();
+// ============================================================================
+// RELIABILITY (2026-08-12): real production diagnostic via Vercel runtime-error
+// logs found exactly 1 "Unparseable model output" failure on /api/match in the
+// prior 7 days, root-caused from the raw log text itself - the response was cut
+// off mid-sentence inside a "why" field, i.e. it hit max_tokens before finishing
+// valid JSON. There was previously ZERO retry logic anywhere in this file, so a
+// single parse failure on the (fallback) single-pass call propagated straight to
+// a user-facing 500. Three layered fixes, in order of preference:
+//   1. Raise max_tokens (below) so a normal, complete response has real headroom
+//      before ever approaching the truncation point.
+//   2. If a response still fails to parse, retry the WHOLE call up to 2 more
+//      times (fresh generation, not a resend of the same truncated text) -
+//      transient truncation on one generation often doesn't recur on the next.
+//   3. If every attempt fails to parse cleanly, salvage: walk the last response's
+//      raw text and pull out every COMPLETE top-level JSON object before the
+//      truncation point, so a response cut off mid-way through school #12 still
+//      returns 11 fully-valid, unmodified schools instead of a 500 error. This
+//      never invents or completes a partial object - only whole, parseable ones
+//      are kept.
+// Verified against Anthropic's own model-deprecation table + 2+ independent
+// sources (not guessed): claude-opus-4-5 has a 64,000-token max output ceiling.
+// MAX_TOKENS_FINAL is set well below that so there's still a hard safety margin.
+// ============================================================================
+export const MAX_TOKENS_FINAL = 16000;      // pass 2 / single-pass final 15-school selection (was 11000)
+export const MAX_TOKENS_CANDIDATES = 2500;  // pass 1 candidate-name list (was 1500; cheap extra headroom)
+export const CLAUDE_CALL_ATTEMPTS = 3;      // 1 initial + 2 retries, per the approved reliability plan
+
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+// Try every reasonable parse variant (raw text, extracted [...] slice, each with
+// trailing commas stripped). Returns the parsed array, or null if none parse -
+// never throws, so callers can decide what to do next (retry vs. salvage).
+export function tryParseJsonArray(text) {
   const stripTrailingCommas = (t) => t.replace(/,(\s*[}\]])/g, '$1');
   const variants = [];
   const m = text.match(/\[[\s\S]*\]/);
   if (m) variants.push(m[0], stripTrailingCommas(m[0]));
   variants.push(text, stripTrailingCommas(text));
-  let parseErr;
   for (const v of variants) {
-    try { return JSON.parse(v); } catch (e) { parseErr = e; }
+    try {
+      const parsed = JSON.parse(v);
+      if (Array.isArray(parsed)) return parsed;
+    } catch { /* try next variant */ }
   }
-  console.error('Unparseable model output (first 500 chars):', text.slice(0, 500));
-  throw new Error('Could not parse model JSON: ' + (parseErr && parseErr.message));
+  return null;
+}
+
+// Last-resort recovery for a response that got cut off mid-array (hit
+// max_tokens before finishing). Walks the raw text tracking brace depth and
+// string/escape state, and returns every COMPLETE top-level `{...}` object
+// found before the truncation point. Never guesses or completes a partial
+// object - an object that's missing its closing brace is simply skipped.
+export function salvagePartialJsonArray(text) {
+  if (!text) return null;
+  const start = text.indexOf('[');
+  if (start === -1) return null;
+
+  const objects = [];
+  let depth = 0;
+  let objStart = -1;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escapeNext) escapeNext = false;
+      else if (ch === '\\') escapeNext = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === '{') {
+      if (depth === 0) objStart = i;
+      depth++;
+    } else if (ch === '}') {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0 && objStart !== -1) {
+        const candidate = text.slice(objStart, i + 1);
+        try {
+          const obj = JSON.parse(candidate);
+          if (obj && typeof obj === 'object') objects.push(obj);
+        } catch { /* incomplete/malformed object right at the cutoff - skip it */ }
+        objStart = -1;
+      }
+    }
+  }
+  return objects.length ? objects : null;
+}
+
+// Fetch + robustly parse a JSON array from Claude, with retry-on-parse-failure
+// and partial-JSON salvage as a last resort. See the RELIABILITY block above
+// for why this exists - designed so a truncated or malformed single generation
+// can never surface as a hard failure to the end user.
+export async function callClaudeForJson(apiKey, model, prompt, maxTokens, attempts = CLAUDE_CALL_ATTEMPTS) {
+  let lastErr = null;
+  let lastText = '';
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error('Anthropic ' + response.status + ': ' + JSON.stringify(err));
+      }
+      const data = await response.json();
+      let text = (data.content || []).map(b => b.text || '').join('');
+      text = text.replace(/```json|```/g, '').trim();
+      lastText = text;
+
+      const parsed = tryParseJsonArray(text);
+      if (parsed) return parsed;
+
+      lastErr = new Error('Model response did not parse as a JSON array');
+      console.warn(JSON.stringify({
+        event: 'claude_json_parse_retry', attempt, attempts, model, maxTokens,
+        textLength: text.length, textTail: text.slice(-200),
+        ts: new Date().toISOString(),
+      }));
+    } catch (e) {
+      lastErr = e;
+      console.warn(JSON.stringify({
+        event: 'claude_call_retry', attempt, attempts, model,
+        message: e && e.message, ts: new Date().toISOString(),
+      }));
+    }
+    if (attempt < attempts) await sleep(400 * attempt); // brief backoff before the next fresh attempt
+  }
+
+  // All attempts exhausted. Try to salvage whole, complete objects from the
+  // LAST response received rather than discarding a mostly-good list outright.
+  const salvaged = salvagePartialJsonArray(lastText);
+  if (salvaged && salvaged.length >= 5) {
+    console.warn(JSON.stringify({
+      event: 'claude_json_salvage_used', model, salvagedCount: salvaged.length,
+      ts: new Date().toISOString(),
+    }));
+    return salvaged;
+  }
+
+  console.error('Unparseable model output after ' + attempts + ' attempts (last 500 chars):', lastText.slice(-500));
+  throw new Error('Could not parse model JSON after ' + attempts + ' attempts: ' + (lastErr && lastErr.message));
 }
 
 async function runTwoPass(apiKey, p, needsAid, basePrompt, sort) {
   // Pass 1 — fast model proposes a candidate pool (names only).
-  const candidates = await callClaudeForJson(apiKey, 'claude-haiku-4-5-20251001', buildCandidatePrompt(p, sort), 1500);
+  const candidates = await callClaudeForJson(apiKey, 'claude-haiku-4-5-20251001', buildCandidatePrompt(p, sort), MAX_TOKENS_CANDIDATES);
   if (!Array.isArray(candidates) || candidates.length < 15) {
     throw new Error('Pass 1 returned too few candidates');
   }
@@ -718,8 +852,22 @@ async function runTwoPass(apiKey, p, needsAid, basePrompt, sort) {
   })).filter((c) => c.name);
   if (pool.length < 15) throw new Error('Pass 1 produced too few valid names');
 
-  // Attach REAL Scorecard data to every candidate (parallel).
+  // Attach REAL Scorecard data to every candidate (parallel), then use the SAME
+  // unitid Scorecard already returns to pull NCAA division + Clery campus-safety
+  // data from our own institution_facts KB (built 2026-08) — reusing the exact
+  // verified-candidate-pool mechanism already trusted for cost/size/admit-rate,
+  // not a separate post-hoc correction step. Both KB lookups gracefully no-op
+  // (empty map / null threshold) if Supabase env vars are missing or the call
+  // fails, same degradation pattern as Scorecard/BEA below.
   const datas = await Promise.allSettled(pool.map((c) => fetchScorecard(c, apiKey)));
+  const unitids = datas
+    .map((r) => (r.status === 'fulfilled' && r.value) ? r.value.unitid : null)
+    .filter((id) => id != null);
+  const [factsByUnitid, cleryThreshold] = await Promise.all([
+    fetchInstitutionFacts(unitids),
+    getCleryTopQuartileThreshold(),
+  ]);
+
   const student = parseStudentTest(p);
   const studentPostal = US_POSTAL_BY_NAME[String((p && p.location) || '').trim()] || '';
   const lines = pool.map((c, i) => {
@@ -733,21 +881,138 @@ async function runTwoPass(apiKey, p, needsAid, basePrompt, sort) {
     const net = pickNetPrice(d, needsAid, p && p.income);
     const sticker = pickStickerTuition(d, studentPostal);
     const cls = classifyAdmissibility(student, d);
-    return `- ${c.name}${loc}: ${admit}${sat}${act}${size}${sticker ? ', ' + sticker.label.toLowerCase() + ' sticker ~$' + fmtK(sticker.value) + '/yr' : ''}${net ? ', net ~$' + fmtK(net.value) + '/yr' : ''}${cls ? ', looks ' + cls : ''}`;
+
+    // NCAA / Clery enrichment. D1/D2/D3/NAIA all count equally as "has varsity
+    // sports" (decided 2026-08-12); NJCAA is deliberately never surfaced here —
+    // there's no "wants a community college" signal anywhere in the app to gate
+    // it on, so crediting it would be misleading for a 4-year-focused matcher.
+    const facts = d.unitid != null ? factsByUnitid[d.unitid] : null;
+    const validDiv = facts && ['D1', 'D2', 'D3', 'NAIA'].includes(facts.ncaa_div) ? facts.ncaa_div : null;
+    const ncaaText = validDiv ? `, NCAA ${validDiv} varsity athletics` : '';
+    const safetyText = (facts && facts.clery_rate != null && cleryThreshold != null && facts.clery_rate <= cleryThreshold)
+      ? ', top-quartile campus safety'
+      : '';
+
+    return `- ${c.name}${loc}: ${admit}${sat}${act}${size}${sticker ? ', ' + sticker.label.toLowerCase() + ' sticker ~$' + fmtK(sticker.value) + '/yr' : ''}${net ? ', net ~$' + fmtK(net.value) + '/yr' : ''}${cls ? ', looks ' + cls : ''}${ncaaText}${safetyText}`;
   });
 
-  const poolText = 'VERIFIED CANDIDATE POOL (current College Scorecard data). Choose your final 15 FROM THIS POOL ONLY, using these REAL numbers for cost / size / admit rate / admissibility — do not substitute remembered figures. Sticker prices shown are already residency-correct for this specific student:\n'
+  const poolText = 'VERIFIED CANDIDATE POOL (current College Scorecard + institution_facts KB data). Choose your final 15 FROM THIS POOL ONLY, using these REAL numbers for cost / size / admit rate / admissibility / NCAA division / campus safety — do not substitute remembered figures. Sticker prices shown are already residency-correct for this specific student:\n'
     + lines.join('\n') + '\n\n';
 
   // Pass 2 — strong model makes the final, data-driven selection.
-  return await callClaudeForJson(apiKey, 'claude-opus-4-5', poolText + basePrompt, 11000);
+  return await callClaudeForJson(apiKey, 'claude-opus-4-5', poolText + basePrompt, MAX_TOKENS_FINAL);
+}
+
+// ============================================================================
+// INSTITUTION FACTS KB (NCAA division + Clery campus-safety rate)
+// ----------------------------------------------------------------------------
+// Populated by the local kb-ingest pipeline into Supabase table
+// `institution_facts` (5,863 rows, confirmed live 2026-08-12), keyed by IPEDS
+// unitid — the SAME id fetchScorecard() already returns per candidate, so no
+// extra name-matching logic is needed. Reused inside the existing verified-
+// candidate-pool mechanism (see runTwoPass), NOT a separate post-hoc
+// correction step, so the model's picks and its "why" narrative can never
+// disagree with these numbers. Requires SUPABASE_URL / SUPABASE_SECRET_KEY —
+// if either is missing, or the request fails for any reason, these return an
+// empty map / null threshold and callers silently fall back to the model's
+// own judgment, the same graceful-degradation pattern used for Scorecard/BEA.
+//
+// normalizeSupabaseUrl mirrors the exact fix already shipped + regression-
+// tested in the kb-ingest script (STEP-4-MAIN-SCRIPT.mjs): Supabase's newer
+// "Data API" dashboard page hands out a URL with a trailing /rest/v1/, which
+// would otherwise double up with the /rest/v1/... path built below.
+// ============================================================================
+export function normalizeSupabaseUrl(url) {
+  return String(url ?? '').trim().replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+}
+
+export async function fetchInstitutionFacts(unitids) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+  const ids = [...new Set((unitids || []).filter((id) => Number.isFinite(id)))];
+  if (!url || !key || !ids.length) return {};
+
+  const base = normalizeSupabaseUrl(url);
+  const endpoint = `${base}/rest/v1/institution_facts?unitid=in.(${ids.join(',')})&select=unitid,ncaa_div,clery_rate`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const resp = await fetch(endpoint, {
+      signal: controller.signal,
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!resp.ok) return {};
+    const rows = await resp.json();
+    if (!Array.isArray(rows)) return {};
+    const byUnitid = {};
+    for (const row of rows) {
+      if (row && row.unitid != null) byUnitid[row.unitid] = row;
+    }
+    return byUnitid;
+  } catch {
+    return {}; // graceful skip — same pattern as fetchScorecard / fetchStateRPP
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Campus Safety scoring: percentile-rank every school's clery_rate (on-campus
+// liquor-law arrests + referrals per enrolled student — lower is better)
+// against ALL rows in institution_facts and take the top-quartile (lowest
+// 25%) cutoff, per the approved design doc. Cached at module scope for
+// CLERY_THRESHOLD_TTL_MS so a warm serverless instance doesn't re-fetch and
+// re-sort ~5,863 rows on every single match request — only once per cold
+// start / cache expiry.
+let _cleryThresholdCache = { value: null, fetchedAt: 0 };
+const CLERY_THRESHOLD_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+export async function getCleryTopQuartileThreshold() {
+  const now = Date.now();
+  if (_cleryThresholdCache.value != null && (now - _cleryThresholdCache.fetchedAt) < CLERY_THRESHOLD_TTL_MS) {
+    return _cleryThresholdCache.value;
+  }
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key) return null;
+
+  const base = normalizeSupabaseUrl(url);
+  const endpoint = `${base}/rest/v1/institution_facts?select=clery_rate&clery_rate=not.is.null`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const resp = await fetch(endpoint, {
+      signal: controller.signal,
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!resp.ok) return null;
+    const rows = await resp.json();
+    if (!Array.isArray(rows) || !rows.length) return null;
+    const rates = rows.map((r) => Number(r && r.clery_rate)).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+    if (!rates.length) return null;
+    const idx = Math.min(Math.floor(rates.length * 0.25), rates.length - 1);
+    const threshold = rates[idx];
+    _cleryThresholdCache = { value: threshold, fetchedAt: now };
+    return threshold;
+  } catch {
+    return null; // graceful skip — same pattern as everywhere else in this file
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Test-only helper: the module-scope Clery threshold cache above deliberately
+// has no expiry hook exposed anywhere else, so the automated test suite needs
+// a way to reset it between cases. Not used by any production code path.
+export function __resetCleryThresholdCacheForTests() {
+  _cleryThresholdCache = { value: null, fetchedAt: 0 };
 }
 
 // Compact prompt for the candidate-shortlist pass (names only).
 function buildCandidatePrompt(p, sort) {
   return `You are a US college expert. A student is using the Next4 card-sort matcher. Propose ~24 REAL US colleges that plausibly fit, respecting the hard filters. Return ONLY a JSON array of objects { "name": "Full Official Name", "city": "City", "state": "ST" } — no prose, no markdown.
 
-STUDENT: home state ${p.location || '?'}, GPA ${p.gpa || '?'}${p.gpaScale ? ' (' + p.gpaScale + ')' : ''}, test ${p.testType || '?'} ${p.testScore || ''}, budget ${p.budget || '?'}, major ${p.major || '?'}, grade ${p.grade || '?'}.
+STUDENT: home state ${p.location || '?'}, GPA ${p.gpa || '?'}${p.gpaScale ? ' (' + p.gpaScale + ')' : ''}, test ${p.testType || '?'} ${p.testScore || ''}, budget ${p.budget || '?'}, major(s) ${(sort.majorList && sort.majorList.length) ? sort.majorList.join(', ') : '?'}, grade ${p.grade || '?'}.
 MUST HAVE: ${(sort.mustHave || []).join(', ') || 'none'}
 WOULD LIKE: ${(sort.wouldLike || []).join(', ') || 'none'}
 WOULD RATHER NOT: ${(sort.preferNot || []).join(', ') || 'none'}
