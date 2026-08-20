@@ -15,12 +15,14 @@ export default async function handler(req, res) {
     } = req.body;
     const p = studentProfile || {};
 
-    // Defensive server-side cap: the frontend enforces a 12-card Must Have limit
-    // (raised from an unlimited count so each Must Have carries more signal for
-    // the model), but never trust the client alone — clamp here too.
-    const mustHave = Array.isArray(rawMustHave) ? rawMustHave.slice(0, 12) : [];
-    if (Array.isArray(rawMustHave) && rawMustHave.length > 12) {
-      console.warn(JSON.stringify({ event: 'must_have_over_cap', received: rawMustHave.length, ts: new Date().toISOString() }));
+    // Defensive server-side cap: the frontend enforces a 10-card Must Have limit
+    // (tightened from 12 on 2026-08-18 so each Must Have carries more signal for
+    // the model), but never trust the client alone — clamp here too. Keep this
+    // number in sync with MUST_HAVE_CAP in index.html.
+    const MUST_HAVE_CAP = 10;
+    const mustHave = Array.isArray(rawMustHave) ? rawMustHave.slice(0, MUST_HAVE_CAP) : [];
+    if (Array.isArray(rawMustHave) && rawMustHave.length > MUST_HAVE_CAP) {
+      console.warn(JSON.stringify({ event: 'must_have_over_cap', received: rawMustHave.length, cap: MUST_HAVE_CAP, ts: new Date().toISOString() }));
     }
 
     // Detect whether the student signaled a need for financial aid. Drives net-price
