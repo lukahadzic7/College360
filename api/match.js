@@ -299,24 +299,31 @@ FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fa
     // pass (the model's own picks) if Scorecard is off or pass 1 fails, so the
     // endpoint never breaks.
     let schools = null;
+    // Scorecard rows already fetched during pass 1, keyed by lowercased school
+    // name. Reused by enrichWithScorecard below so the final 15 don't trigger a
+    // second round of identical lookups (see LATENCY note there).
+    let prefetched = null;
     if (process.env.SCORECARD_API_KEY) {
       try {
-        schools = await runTwoPass(apiKey, p, needsAid, prompt, {
+        const twoPass = await runTwoPass(apiKey, p, needsAid, prompt, {
           mustHave, wouldLike, preferNot, dontLike, dimensionSection, majorList,
         });
+        schools = twoPass.schools;
+        prefetched = twoPass.byName;
       } catch (e) {
         console.warn('Two-pass failed; falling back to single pass:', e && e.message);
         schools = null;
+        prefetched = null;
       }
     }
     if (!schools) {
-      schools = await callClaudeForJson(apiKey, 'claude-opus-4-5', prompt, MAX_TOKENS_FINAL);
+      schools = await callClaudeForJson(apiKey, MODEL_FINAL, prompt, MAX_TOKENS_FINAL);
     }
 
     schools = sanitizeSchools(schools);
     // Final verification layer: replace any remembered figures with REAL
     // Scorecard data and recompute admissibility. No-op if no key / API down.
-    schools = await enrichWithScorecard(schools, p, needsAid);
+    schools = await enrichWithScorecard(schools, p, needsAid, prefetched);
 
     // Passive success log — lets Luka grep Vercel logs for match_success vs
     // match_error counts to see clean-run-to-error ratio over time.
@@ -457,16 +464,25 @@ const SCORECARD_FIELDS = [
   'latest.earnings.10_yrs_after_entry.median',
 ].join(',');
 
-async function enrichWithScorecard(schools, profile, needsAid) {
+async function enrichWithScorecard(schools, profile, needsAid, prefetched) {
   const apiKey = process.env.SCORECARD_API_KEY;
   if (!apiKey) return schools; // graceful fallback: no key -> model output as-is
 
   const student = parseStudentTest(profile);
   const studentPostal = US_POSTAL_BY_NAME[String((profile && profile.location) || '').trim()] || '';
 
-  // Look up every school in parallel; one slow/failed lookup can't block others.
+  // LATENCY (2026-08-20): in two-pass mode every final school was ALREADY looked
+  // up during pass 1 — the final 15 are a subset of the 26 candidates. This used
+  // to re-fetch all 15 from College Scorecard, a second round trip of identical
+  // requests on the critical path of a request users were waiting ~64s for.
+  // Now pass 1's rows are reused, and only genuine misses (a school the model
+  // named that wasn't in the candidate pool) are fetched.
+  const cache = prefetched || {};
   const results = await Promise.allSettled(
-    schools.map((s) => fetchScorecard(s, apiKey))
+    schools.map((s) => {
+      const hit = cache[String(s.name || '').trim().toLowerCase()];
+      return hit ? Promise.resolve(hit) : fetchScorecard(s, apiKey);
+    })
   );
 
   return schools.map((s, i) => {
@@ -710,12 +726,36 @@ function fmtK(n) { return Math.round(n / 1000) + 'K'; }
 //      never invents or completes a partial object - only whole, parseable ones
 //      are kept.
 // Verified against Anthropic's own model-deprecation table + 2+ independent
-// sources (not guessed): claude-opus-4-5 has a 64,000-token max output ceiling.
+// sources (not guessed): claude-opus-5 has a 128,000-token max output ceiling
+// (the previous model, opus-4-5, allowed 64,000 — this stays safe under both).
 // MAX_TOKENS_FINAL is set well below that so there's still a hard safety margin.
 // ============================================================================
 export const MAX_TOKENS_FINAL = 16000;      // pass 2 / single-pass final 15-school selection (was 11000)
 export const MAX_TOKENS_CANDIDATES = 2500;  // pass 1 candidate-name list (was 1500; cheap extra headroom)
 export const CLAUDE_CALL_ATTEMPTS = 3;      // 1 initial + 2 retries, per the approved reliability plan
+
+// ============================================================================
+// MODELS (upgraded 2026-08-20, pre-App-Store)
+// ----------------------------------------------------------------------------
+// Was claude-opus-4-5 + claude-haiku-4-5-20251001. Both are still Active, but
+// per Anthropic's own deprecation table they retire "not sooner than" Nov 24
+// 2026 and Oct 15 2026 respectively — inside months of launch. Retirement of
+// the FINAL model would have broken matching outright (requests to a retired
+// model fail), and shipping an App Store build on a clock like that is an
+// avoidable risk.
+//
+// Current generation instead: opus-5 retires not sooner than Jul 24 2027, and
+// sonnet-5 not sooner than Jun 30 2027 — both well past any realistic review
+// and launch cycle, and both newer/faster than what they replace.
+//
+// Note for future edits: Claude 4.7+ models reject temperature/top_p/top_k with
+// a 400 if set to a non-default value. This file never sets them — keep it that
+// way. `effort` (defaults to "high" on these models) is the main remaining
+// latency lever if matches ever need to get faster; lowering it trades some
+// reasoning depth for speed, so it should be measured before being changed.
+// ============================================================================
+export const MODEL_FINAL = 'claude-opus-5';       // final 15-school selection (quality-critical)
+export const MODEL_CANDIDATES = 'claude-sonnet-5'; // pass 1 shortlist of real school names (speed-critical)
 
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
@@ -844,7 +884,7 @@ export async function callClaudeForJson(apiKey, model, prompt, maxTokens, attemp
 
 async function runTwoPass(apiKey, p, needsAid, basePrompt, sort) {
   // Pass 1 — fast model proposes a candidate pool (names only).
-  const candidates = await callClaudeForJson(apiKey, 'claude-haiku-4-5-20251001', buildCandidatePrompt(p, sort), MAX_TOKENS_CANDIDATES);
+  const candidates = await callClaudeForJson(apiKey, MODEL_CANDIDATES, buildCandidatePrompt(p, sort), MAX_TOKENS_CANDIDATES);
   if (!Array.isArray(candidates) || candidates.length < 15) {
     throw new Error('Pass 1 returned too few candidates');
   }
@@ -901,8 +941,17 @@ async function runTwoPass(apiKey, p, needsAid, basePrompt, sort) {
   const poolText = 'VERIFIED CANDIDATE POOL (current College Scorecard + institution_facts KB data). Choose your final 15 FROM THIS POOL ONLY, using these REAL numbers for cost / size / admit rate / admissibility / NCAA division / campus safety — do not substitute remembered figures. Sticker prices shown are already residency-correct for this specific student:\n'
     + lines.join('\n') + '\n\n';
 
+  // Every candidate's Scorecard row, keyed by lowercased name, handed back so
+  // enrichWithScorecard can reuse it instead of re-fetching the same schools.
+  const byName = {};
+  pool.forEach((c, i) => {
+    const d = datas[i].status === 'fulfilled' ? datas[i].value : null;
+    if (d) byName[c.name.trim().toLowerCase()] = d;
+  });
+
   // Pass 2 — strong model makes the final, data-driven selection.
-  return await callClaudeForJson(apiKey, 'claude-opus-4-5', poolText + basePrompt, MAX_TOKENS_FINAL);
+  const schools = await callClaudeForJson(apiKey, MODEL_FINAL, poolText + basePrompt, MAX_TOKENS_FINAL);
+  return { schools, byName };
 }
 
 // ============================================================================
