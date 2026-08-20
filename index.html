@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Next4</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiIgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Im5leHQ0Ij48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSI3LjA0IiBmaWxsPSIjMTcxYTNkIi8+PGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2YyNmI0ZSIgc3Ryb2tlLXdpZHRoPSIzLjEyIiBzdHJva2UtZGFzaGFycmF5PSIxMy4zODMgNS40NjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgdHJhbnNmb3JtPSJyb3RhdGUoLTkwIDE2IDE2KSIvPjxwYXRoIGQ9Ik0zNzIuNjAwMjgwNzYxNzE4NzUgMFYxMjkuMjAwMzc4NDE3OTY4NzVIMjIuMDAwMTIyMDcwMzEyNVYyNjMuOTk5NTExNzE4NzVMMzM2LjIwMDc0NDYyODkwNjI1IDcxMEg1NDYuNTk4OTM3OTg4MjgxMlYyNzEuNTk5NDg3MzA0Njg3NUg2MjguMTk5MDM1NjQ0NTMxMlYxMjkuMjAwMzc4NDE3OTY4NzVINTQ2LjU5ODkzNzk4ODI4MTJWMFpNMjAxLjk5ODk2MjQwMjM0Mzc1IDI3MS41OTk0ODczMDQ2ODc1SDM3Mi42MDAyODA3NjE3MTg3NVY1MDQuNDAxMTIzMDQ2ODc1WiIgZmlsbD0iI2Y3ZjRlZiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoOS4zNTM2IDIyLjg4KSBzY2FsZSgwLjAxOTg0IC0wLjAxOTg0KSIvPjwvc3ZnPg==">
+<link rel="apple-touch-icon" href="next4-app-icon.png">
+<meta name="theme-color" content="#171a3d">
+<meta property="og:title" content="next4 — Your AI College Counselor">
+<meta property="og:description" content="Sort cards. Get matched. Find the colleges that actually fit you.">
+<meta property="og:image" content="next4-og-image.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -21,8 +29,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 #splash::before{content:'';position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(30,34,88,.4) 0%,transparent 70%);top:-200px;right:-200px}
 #splash::after{content:'';position:absolute;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(46,53,127,.18) 0%,transparent 70%);bottom:-100px;left:-100px}
 .splash-inner{text-align:center;z-index:1;padding:40px;max-width:560px}
-.splash-logo{font-family:'Bebas Neue',sans-serif;font-size:clamp(64px,12vw,120px);color:var(--cream);line-height:.9;letter-spacing:2px}
-.splash-logo span{color:var(--c1)}
+/* Brand wordmark. The .wm element keeps the logo's own 225.256:91.76 aspect
+   ratio; each placement below sets only a width, and `color` drives the n/e/x/t
+   letterforms (fill:currentColor in the symbol). The 4 stays Coral everywhere. */
+.wm{width:100%;height:auto;aspect-ratio:225.256/91.76;display:block}
+.splash-logo{color:var(--cream);width:clamp(200px,42vw,330px);margin:0 auto}
 .splash-tagline{font-family:'Bebas Neue',sans-serif;font-size:clamp(20px,4vw,32px);color:var(--cream);margin-top:16px;line-height:1.1;letter-spacing:.5px}
 .splash-sub2{font-size:15px;color:rgba(247,244,239,.5);margin-top:8px;font-style:italic}
 .splash-desc{color:rgba(247,244,239,.6);max-width:400px;margin:28px auto 44px;line-height:1.7;font-size:15px}
@@ -34,8 +45,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 #intake{background:#171a3d;align-items:center;justify-content:center;padding:0 24px}
 #categoryRank{background:#171a3d;align-items:center;justify-content:center;padding:0 24px}
 .intake-inner{width:100%;max-width:520px;z-index:1;padding:40px 0}
-.intake-logo{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--cream);letter-spacing:1px;margin-bottom:32px}
-.intake-logo span{color:var(--c1)}
+.intake-logo{color:var(--cream);width:76px;margin-bottom:32px}
 .intake-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,6vw,52px);color:var(--cream);line-height:1;margin-bottom:8px}
 .intake-sub{color:rgba(247,244,239,.45);font-size:14px;margin-bottom:36px;line-height:1.6}
 .intake-form{display:flex;flex-direction:column;gap:20px}
@@ -82,8 +92,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 /* ── SORTING ── */
 #sorting{background:var(--bg);align-items:center;padding:0 20px}
 .top-bar{width:100%;max-width:700px;display:flex;align-items:center;justify-content:space-between;padding:20px 0 10px}
-.top-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--ink);letter-spacing:1px}
-.top-logo span{color:var(--c1)}
+/* The one placement on the cream background — keeps the logo's own Ink Navy
+   letterforms exactly as delivered in next4-logo.svg. */
+.top-logo{color:var(--ink);width:82px;flex-shrink:0}
 .progress-wrap{display:flex;align-items:center;gap:10px}
 .progress-bar{width:140px;height:4px;background:var(--rule);border-radius:2px;overflow:hidden}
 .progress-fill{height:100%;background:var(--c4);border-radius:2px;transition:width .4s ease}
@@ -232,6 +243,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .btn-share:hover{filter:brightness(.88)}
 .disclaimer{font-size:11px;color:var(--muted);line-height:1.6;margin-top:28px;padding:14px 18px;background:rgba(0,0,0,.03);border-radius:8px;border:1px solid var(--rule);text-align:center}
 
+/* ── MODALS (welcome popup + dealbreaker suggestion) ── */
+#welcomeOverlay,#dbOverlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10002;display:none;align-items:center;justify-content:center;padding:20px}
+#welcomeOverlay.active,#dbOverlay.active{display:flex}
+.modal-card{background:var(--surface);border-radius:20px;padding:30px 26px 24px;max-width:380px;width:100%;max-height:85vh;overflow-y:auto;text-align:center}
+.modal-mark{width:96px;margin:0 auto 18px;color:var(--ink)}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:30px;line-height:1.05;color:var(--ink);margin-bottom:12px}
+.modal-body{font-size:14px;color:var(--gray);line-height:1.65;margin-bottom:14px;text-align:center}
+.modal-body b{font-weight:600;color:var(--ink)}
+.modal-btn{width:100%;background:var(--c1);color:var(--ink);border:none;padding:15px;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:2px;cursor:pointer;transition:all .2s;margin-top:6px}
+.modal-btn:hover{filter:brightness(.88)}
+.modal-btn-sec{width:100%;background:transparent;border:none;color:var(--gray);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;padding:12px;margin-top:4px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.modal-btn-sec:hover{color:var(--ink)}
+
 /* ── SHARE CARD OVERLAY ── */
 #shareOverlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:10000;display:none;align-items:center;justify-content:center;padding:20px}
 #shareOverlay.active{display:flex}
@@ -247,8 +271,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .share-pct{font-family:'Bebas Neue',sans-serif;font-size:24px;line-height:1}
 .share-brand{text-align:center;margin-bottom:16px}
 .share-brand-sub{font-size:11px;color:rgba(247,244,239,.3);margin-bottom:4px}
-.share-brand-name{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--cream);letter-spacing:1px}
-.share-brand-name span{color:var(--c1)}
+.share-brand-name{color:var(--cream);width:64px;margin:0 auto}
 .share-btn-go{width:100%;padding:14px;border-radius:8px;border:none;background:var(--c1);color:var(--ink);font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer;transition:all .2s}
 .share-btn-go:hover{filter:brightness(.88)}
 .share-close{position:absolute;top:14px;right:16px;background:none;border:none;color:rgba(247,244,239,.35);font-size:22px;cursor:pointer;line-height:1;padding:4px}
@@ -267,17 +290,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 </head>
 <body>
 
+<!-- Brand wordmark, defined once and referenced via <use> below. The n/e/x/t
+     letterforms use fill="currentColor" so each placement can be Cream on the
+     navy screens or Ink Navy on the cream sorting screen; the 4 is always Coral. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="wm" viewBox="0 0 225.256 91.76"><path d="M60.80029296875 0V537.9998779296875H215.39910888671875L222.3990478515625 373.40032958984375L201.19921875 376.8004150390625Q207.999267578125 441.400146484375 232.59927368164062 479.10003662109375Q257.19927978515625 516.7999267578125 294.29925537109375 533.39990234375Q331.39923095703125 549.9998779296875 376.399169921875 549.9998779296875Q433.39923095703125 549.9998779296875 474.49920654296875 525.3998413085938Q515.5991821289062 500.7998046875 537.8991394042969 455.2998046875Q560.1990966796875 409.7998046875 560.1990966796875 345.7999267578125V0H388.200439453125V287.40045166015625Q388.200439453125 328.40057373046875 382.30035400390625 357.10064697265625Q376.4002685546875 385.80072021484375 360.6001281738281 400.9007568359375Q344.79998779296875 416.00079345703125 315.99981689453125 416.00079345703125Q274.19952392578125 416.00079345703125 253.49923706054688 382.7007141113281Q232.7989501953125 349.400634765625 232.7989501953125 287.40045166015625V0Z" fill="currentColor" transform="translate(6 74) scale(0.074 -0.074)"/><path d="M314.1995849609375 -12Q229.5997314453125 -12 166.69985961914062 22.79998779296875Q103.79998779296875 57.5999755859375 69.10006713867188 120.89996337890625Q34.400146484375 184.199951171875 34.400146484375 268.99993896484375Q34.400146484375 353.7999267578125 69.10006713867188 416.59991455078125Q103.79998779296875 479.39990234375 166.49984741210938 514.6998901367188Q229.19970703125 549.9998779296875 313.3995361328125 549.9998779296875Q396.79931640625 549.9998779296875 458.1991882324219 514.2999267578125Q519.5990600585938 478.5999755859375 552.6990051269531 412.60003662109375Q585.7989501953125 346.60009765625 585.7989501953125 256.0001220703125V223.80023193359375H211.998779296875Q214.59881591796875 167.59979248046875 243.0989990234375 140.19955444335938Q271.59918212890625 112.79931640625 317.3995361328125 112.79931640625Q350.99981689453125 112.79931640625 374.0999755859375 126.49948120117188Q397.20013427734375 140.19964599609375 407.00018310546875 170.59979248046875L578.5989379882812 161.1998291015625Q556.7989501953125 77.4000244140625 485.8991394042969 32.70001220703125Q414.99932861328125 -12 314.1995849609375 -12ZM211.998779296875 321.79986572265625H412.2001953125Q410.20013427734375 374.80023193359375 383.2999572753906 401.6003723144531Q356.3997802734375 428.4005126953125 313.3995361328125 428.4005126953125Q271.5992431640625 428.4005126953125 244.09906005859375 400.1003723144531Q216.598876953125 371.80023193359375 211.998779296875 321.79986572265625Z" fill="currentColor" transform="translate(48.954 74) scale(0.074 -0.074)"/><path d="M45.4000244140625 0 234.80010986328125 272 49.0001220703125 537.9998779296875H228.598876953125L334.79937744140625 374.79931640625L438.599853515625 537.9998779296875H621.798583984375L436.39862060546875 271.5999755859375L625.9986572265625 0H446.39990234375L337.99932861328125 170.8006591796875L228.5987548828125 0Z" fill="currentColor" transform="translate(91.834 74) scale(0.074 -0.074)"/><path d="M293.19970703125 0Q205.99993896484375 0 165.50003051757812 40.599884033203125Q125.0001220703125 81.19976806640625 125.0001220703125 169.5994873046875V664.3998413085938H296.998779296875V192.399169921875Q296.998779296875 153.19921875 313.3987731933594 138.79922485351562Q329.79876708984375 124.39923095703125 363.5987548828125 124.39923095703125H437.998779296875V0ZM35.80029296875 413.60064697265625V537.9998779296875H437.998779296875V413.60064697265625Z" fill="currentColor" transform="translate(138.488 74) scale(0.074 -0.074)"/><path d="M372.60028076171875 0V129.20037841796875H22.0001220703125V263.99951171875L336.20074462890625 710H546.5989379882812V271.5994873046875H628.1990356445312V129.20037841796875H546.5989379882812V0ZM201.99896240234375 271.5994873046875H372.60028076171875V504.401123046875Z" fill="#f26b4e" transform="translate(169.676 74) scale(0.074 -0.074)"/></symbol></defs></svg>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <!-- SPLASH -->
 <div id="splash" class="screen active">
   <div class="splash-inner">
-    <div class="splash-logo">Next<span>4</span></div>
+    <div class="splash-logo"><svg class="wm" role="img" aria-label="next4"><use href="#wm"/></svg></div>
     <div class="splash-tagline">Find Your Perfect Match</div>
-    <div class="splash-sub2">What are you really looking for?</div>
+    <div class="splash-sub2">A college counselor in your back pocket</div>
     <p class="splash-desc">Sort through topics that matter to you — your values, lifestyle, and goals. Our AI matches you with colleges that fit your life, not just your grades.</p>
-    <button class="btn-primary" onclick="showScreen('intake')">GET STARTED</button>
+    <button class="btn-primary" onclick="openWelcome()">GET STARTED</button>
     <div class="splash-count" id="totalCount"></div>
   </div>
 </div>
@@ -285,7 +313,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 <!-- INTAKE FORM -->
 <div id="intake" class="screen">
   <div class="intake-inner">
-    <div class="intake-logo">Next<span>4</span></div>
+    <div class="intake-logo"><svg class="wm" role="img" aria-label="next4"><use href="#wm"/></svg></div>
     <div class="intake-progress">
       <div class="intake-pip active"></div>
       <div class="intake-pip active"></div>
@@ -405,7 +433,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 <!-- CATEGORY RANK -->
 <div id="categoryRank" class="screen">
   <div class="intake-inner" style="max-width:560px">
-    <div class="intake-logo">Next<span>4</span></div>
+    <div class="intake-logo"><svg class="wm" role="img" aria-label="next4"><use href="#wm"/></svg></div>
     <div class="intake-title">What Matters<br>Most To You?</div>
     <div class="intake-sub">Tap categories in order of importance, most important first. This helps us weigh your card sort — but your actual card choices still come first. Skip if you'd rather not rank them.</div>
     <div id="catRankList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px"></div>
@@ -419,7 +447,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 <!-- SORTING -->
 <div id="sorting" class="screen">
   <div class="top-bar">
-    <div class="top-logo">Next<span>4</span></div>
+    <div class="top-logo"><svg class="wm" role="img" aria-label="next4"><use href="#wm"/></svg></div>
     <div class="progress-wrap">
       <div class="section-bar" id="sectionBar"><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
       <div class="progress-label" id="pLabel">&nbsp;</div>
@@ -1040,9 +1068,23 @@ function showScreen(id){
   document.getElementById(id).classList.add('active');
 }
 
+// Welcome popup — sits between GET STARTED and the intake questions. Sets
+// expectations for the sort (use all five boxes, answer honestly) at the moment
+// it's most useful, before any questions are asked.
+function openWelcome(){ document.getElementById('welcomeOverlay').classList.add('active'); }
+function closeWelcome(){
+  document.getElementById('welcomeOverlay').classList.remove('active');
+  showScreen('intake');
+}
+
 // ── CARD RENDERING ────────────────────────────────────────────
 function renderCard(){
-  if(idx>=cards.length){finishSorting();return;}
+  // Skip over anything already sorted. Normally a no-op (idx advances one card
+  // at a time), but it's what lets reopenNeutralCards() put a subset of cards
+  // back in front of the student without disturbing the ones already placed.
+  while(idx<cards.length && placements[idx]!==undefined) idx++;
+
+  if(idx>=cards.length){ finishSorting(); return; }
 
   const card=cards[idx];
   const el=document.getElementById('mainCard');
@@ -1082,7 +1124,16 @@ function showToast(msg){
 }
 
 // ── PLACEMENT ─────────────────────────────────────────────────
-const MUST_HAVE_CAP = 12;
+// Must Have is CAPPED at 10 — a hard ceiling, the 11th card is blocked outright,
+// so that each Must Have stays high-signal for the matcher.
+//
+// Not For Me has NO hard limit. Instead, DEALBREAKER_SUGGESTED is the number we
+// recommend: if the student finishes the sort below it, they get a one-time
+// suggestion (not a block) offering to revisit their "Doesn't Matter" pile. They
+// can always decline and go straight to results.
+const MUST_HAVE_CAP = 10;
+const DEALBREAKER_SUGGESTED = 5;
+
 function placeCard(cat){
   if(cat===5 && counts[5]>=MUST_HAVE_CAP){
     showToast(`You've hit your limit of ${MUST_HAVE_CAP} Must Haves. Remove one to add another.`);
@@ -1090,6 +1141,15 @@ function placeCard(cat){
   }
   placements[idx]=cat;
   counts[cat]++;
+
+  // Running count for the one pile that has a ceiling.
+  if(cat===5){
+    const left=MUST_HAVE_CAP-counts[5];
+    showToast(left>0
+      ? `Must Have ${counts[5]} of ${MUST_HAVE_CAP} — ${left} left`
+      : `That's all ${MUST_HAVE_CAP} Must Haves used`);
+  }
+
   const el=document.getElementById('mainCard');
   el.classList.add('flying');
   const zone=document.querySelector(`.zone[data-cat="${cat}"]`);
@@ -1182,11 +1242,61 @@ document.addEventListener('keydown',e=>{
 });
 
 // ── LOADING — 10 second story ────────────────────────────────
+// Shown once when the deck runs out, if the student is light on either of the
+// two high-signal piles: under DEALBREAKER_SUGGESTED in Not For Me, or under the
+// full MUST_HAVE_CAP in Must Have. Whichever applies is shown (possibly both) in
+// a single popup, so they never get two prompts back to back. This is a
+// RECOMMENDATION, never a block — "See my results" is always available.
+// _suggestShown stops it reappearing if they take the suggestion and finish again.
+let _suggestShown=false;
+const nCards=n=>n===1?'1 card':`${n} cards`;
+
 function finishSorting(){
+  const lowDb=counts[1]<DEALBREAKER_SUGGESTED;
+  const lowMh=counts[5]<MUST_HAVE_CAP;
+  if(!_suggestShown && (lowDb||lowMh)){
+    const neutral=Object.keys(placements).filter(k=>placements[k]===3).length;
+    // Only worth offering if there are neutral cards to actually revisit.
+    if(neutral>0){
+      _suggestShown=true;
+      const dbEl=document.getElementById('sugDb');
+      const mhEl=document.getElementById('sugMh');
+      dbEl.style.display=lowDb?'':'none';
+      mhEl.style.display=lowMh?'':'none';
+      if(lowDb) document.getElementById('dbCount').textContent=nCards(counts[1]);
+      if(lowMh) document.getElementById('mhCount').textContent=nCards(counts[5]);
+      document.getElementById('dbNeutral').textContent=nCards(neutral);
+      document.getElementById('dbOverlay').classList.add('active');
+      return;
+    }
+  }
+  startLoading();
+}
+
+function startLoading(){
   showScreen('loading');
   const steps=['ls1','ls2','ls3','ls4','ls5','ls6','ls7','ls8'];
   steps.forEach((id,i)=>setTimeout(()=>document.getElementById(id).classList.add('done'),(i*1100)+400));
   setTimeout(callBackend,2000);
+}
+
+// "Take another look" puts the student's "Doesn't Matter" cards back in front of
+// them, so they have real material to pull Must Haves or dealbreakers from.
+// Their Must Have, Would Like and Would Rather Not piles are left exactly as
+// they were — only the neutral pile is reopened.
+function reopenNeutralCards(){
+  document.getElementById('dbOverlay').classList.remove('active');
+  const neutral=Object.keys(placements).filter(k=>placements[k]===3).map(Number);
+  if(!neutral.length){ startLoading(); return; }
+  for(const i of neutral){ delete placements[i]; counts[3]=Math.max(0,counts[3]-1); }
+  idx=Math.min(...neutral);
+  renderCard();
+  showToast(`Here are your "Doesn't Matter" cards again. Move any that belong in another box.`);
+}
+
+function skipSuggestion(){
+  document.getElementById('dbOverlay').classList.remove('active');
+  startLoading();
 }
 
 // ── AI BACKEND CALL ───────────────────────────────────────────
@@ -1427,6 +1537,7 @@ function nativeShare(){
 function retakeSort(){
   counts={1:0,2:0,3:0,4:0,5:0};
   placements={};idx=0;toastShown=false;
+  _suggestShown=false; // fresh sort — the suggestion is eligible to show again
   buildDeck();
   document.querySelectorAll('.load-step').forEach(s=>s.classList.remove('done'));
   showScreen('sorting');
@@ -1440,6 +1551,9 @@ function resetApp(){
   _matchId=null;
   _remaining=[];
   _visible=[];
+  _suggestShown=false;
+  document.getElementById('dbOverlay').classList.remove('active');
+  document.getElementById('welcomeOverlay').classList.remove('active');
   closeSchoolDetail();
   intakeData={location:'',gpa:'',gpaScale:'',testType:'',testScore:'',budget:'',major:[],grade:'',income:''};
   buildDeck();
@@ -1487,6 +1601,31 @@ init();
   </div>
 </div>
 
+<!-- WELCOME POPUP (shown once, after GET STARTED, before the intake questions) -->
+<div id="welcomeOverlay">
+  <div class="modal-card">
+    <div class="modal-mark"><svg class="wm" role="img" aria-label="next4"><use href="#wm"/></svg></div>
+    <div class="modal-title">Welcome to next4</div>
+    <p class="modal-body">You'll sort cards into five boxes, from <b>Not For Me</b> all the way to <b>Must Have</b>, and we'll match you with colleges that fit.</p>
+    <p class="modal-body">Answer honestly, and use all five boxes. The more cards you sort truthfully across every box, the more accurate your matches will be. There are no right answers here, only what's true for you.</p>
+    <button class="modal-btn" onclick="closeWelcome()">LET'S GO</button>
+  </div>
+</div>
+
+<!-- SUGGESTION (soft recommendation at the end of the sort). Covers two cases:
+     under 5 Not For Me, and under 10 Must Have. Either paragraph is hidden when
+     it doesn't apply, so one student may see one, both, or none. -->
+<div id="dbOverlay">
+  <div class="modal-card">
+    <div class="modal-title">One quick suggestion</div>
+    <p class="modal-body" id="sugDb">You marked <b id="dbCount">0 cards</b> as <b>Not For Me</b>. Telling us what you'd rule out is one of the strongest signals we have. Students who mark at least 5 tend to get noticeably sharper matches.</p>
+    <p class="modal-body" id="sugMh">You marked <b id="mhCount">0 cards</b> as <b>Must Have</b>. Telling us what you can't compromise on is one of the strongest signals we have. Students who use all 10 tend to get noticeably sharper matches.</p>
+    <p class="modal-body">You put <b id="dbNeutral">0 cards</b> in <b>Doesn't Matter</b>. Want to look through those again and move any that belong in another box?</p>
+    <button class="modal-btn" onclick="reopenNeutralCards()">TAKE ANOTHER LOOK</button>
+    <button class="modal-btn-sec" onclick="skipSuggestion()">See my results</button>
+  </div>
+</div>
+
 <!-- SHARE OVERLAY -->
 <div id="shareOverlay">
   <div class="share-card">
@@ -1495,7 +1634,7 @@ init();
     <div class="share-top5" id="shareTop5"></div>
     <div class="share-brand">
       <div class="share-brand-sub">find your matches at</div>
-      <div class="share-brand-name">Next<span>4</span></div>
+      <div class="share-brand-name"><svg class="wm" role="img" aria-label="next4"><use href="#wm"/></svg></div>
     </div>
     <button class="share-btn-go" onclick="nativeShare()">SHARE ↗</button>
   </div>
