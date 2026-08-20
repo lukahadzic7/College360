@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Next4</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiIgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Im5leHQ0Ij48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSI3LjA0IiBmaWxsPSIjMTcxYTNkIi8+PGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2YyNmI0ZSIgc3Ryb2tlLXdpZHRoPSIzLjEyIiBzdHJva2UtZGFzaGFycmF5PSIxMy4zODMgNS40NjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgdHJhbnNmb3JtPSJyb3RhdGUoLTkwIDE2IDE2KSIvPjxwYXRoIGQ9Ik0zNzIuNjAwMjgwNzYxNzE4NzUgMFYxMjkuMjAwMzc4NDE3OTY4NzVIMjIuMDAwMTIyMDcwMzEyNVYyNjMuOTk5NTExNzE4NzVMMzM2LjIwMDc0NDYyODkwNjI1IDcxMEg1NDYuNTk4OTM3OTg4MjgxMlYyNzEuNTk5NDg3MzA0Njg3NUg2MjguMTk5MDM1NjQ0NTMxMlYxMjkuMjAwMzc4NDE3OTY4NzVINTQ2LjU5ODkzNzk4ODI4MTJWMFpNMjAxLjk5ODk2MjQwMjM0Mzc1IDI3MS41OTk0ODczMDQ2ODc1SDM3Mi42MDAyODA3NjE3MTg3NVY1MDQuNDAxMTIzMDQ2ODc1WiIgZmlsbD0iI2Y3ZjRlZiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoOS4zNTM2IDIyLjg4KSBzY2FsZSgwLjAxOTg0IC0wLjAxOTg0KSIvPjwvc3ZnPg==">
 <link rel="apple-touch-icon" href="next4-app-icon.png">
@@ -21,9 +21,22 @@
   --c1:#f26b4e;--c2:#1e2258;--c3:#9a9cb0;--c4:#2e357f;--c5:#2e9e73;
   --cream:#f7f4ef;--gray:#5b5f72;
 }
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden}
-.screen{display:none;min-height:100vh}
-.screen.active{display:flex;flex-direction:column}
+/* iOS/WebView sizing. 100vh on iOS measures the viewport as if the browser
+   chrome were hidden, so full-height screens get clipped behind the toolbars;
+   100dvh tracks the real visible area. The 100vh line stays first as a fallback
+   for anything that doesn't support dvh. */
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;min-height:100dvh;overflow-x:hidden;-webkit-text-size-adjust:100%}
+.screen{display:none;min-height:100vh;min-height:100dvh}
+/* viewport-fit=cover lets the app paint edge to edge; these insets keep real
+   content clear of the notch, Dynamic Island and home indicator. They resolve
+   to 0 everywhere that has no notch, so desktop is unaffected. */
+.screen.active{display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
+  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+/* Touch targets: Apple's HIG asks for ~44pt. Rather than resize these controls
+   and disturb the layout, each gets an invisible centred hit area that meets the
+   minimum while the visible button keeps its current size. */
+.fit-btn::after,.undo-btn::after,.detail-close::after,.share-close::after,.major-chip-x::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:max(100%,44px);height:max(100%,44px)}
 
 /* ── SPLASH ── */
 #splash{align-items:center;justify-content:center;background:#171a3d;position:relative;overflow:hidden}
@@ -80,7 +93,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .major-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .major-chips:empty{display:none;margin-bottom:0}
 .major-chip{display:flex;align-items:center;gap:6px;padding:7px 10px 7px 14px;background:rgba(46,53,127,.25);border:1.5px solid rgba(46,53,127,.5);border-radius:20px;font-size:13px;color:var(--cream)}
-.major-chip-x{cursor:pointer;font-size:15px;line-height:1;color:rgba(247,244,239,.6);padding:2px;border-radius:50%;transition:color .12s,background .12s}
+.major-chip-x{position:relative;cursor:pointer;font-size:15px;line-height:1;color:rgba(247,244,239,.6);padding:2px;border-radius:50%;transition:color .12s,background .12s}
 .major-chip-x:hover{color:var(--cream);background:rgba(247,244,239,.15)}
 .major-max-note{padding:12px 16px;font-size:13px;color:rgba(247,244,239,.5);font-style:italic}
 .cat-rank-row{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1.5px solid rgba(247,244,239,.15);border-radius:8px;cursor:pointer;transition:all .2s;color:var(--cream)}
@@ -108,7 +121,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .card-ghost{position:absolute;width:320px;border-radius:16px;background:var(--surface);border:2px solid var(--rule);box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .card-ghost:nth-child(1){height:210px;transform:rotate(3deg) translateY(6px);opacity:.35}
 .card-ghost:nth-child(2){height:210px;transform:rotate(-2deg) translateY(3px);opacity:.6}
-.main-card{width:320px;min-height:200px;background:var(--surface);border-radius:16px;border:2px solid var(--rule);box-shadow:0 8px 40px rgba(0,0,0,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px 32px;position:relative;z-index:10;cursor:grab;user-select:none;transition:box-shadow .2s}
+.main-card{touch-action:none;width:320px;min-height:200px;background:var(--surface);border-radius:16px;border:2px solid var(--rule);box-shadow:0 8px 40px rgba(0,0,0,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px 32px;position:relative;z-index:10;cursor:grab;user-select:none;transition:box-shadow .2s}
 .main-card:active{cursor:grabbing}
 .card-cat-tag{position:absolute;top:14px;left:18px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace}
 .card-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(22px,5vw,36px);text-align:center;line-height:1.05;color:var(--ink)}
@@ -178,6 +191,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .load-step.done{color:rgba(247,244,239,.85)}
 .step-ck{width:20px;height:20px;border-radius:50%;border:2px solid rgba(247,244,239,.15);display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;transition:all .5s}
 .load-step.done .step-ck{background:var(--c5);border-color:var(--c5);color:var(--cream)}
+/* The step currently being worked on — a soft pulse so the screen never looks
+   frozen while the model is still thinking. */
+.load-step.active{color:rgba(247,244,239,.85)}
+.load-step.active .step-ck{border-color:var(--c1);animation:ckPulse 1.4s infinite ease-in-out}
+@keyframes ckPulse{0%,100%{opacity:.35}50%{opacity:1}}
+.load-note{margin-top:22px;font-size:13px;color:#9a9cb0;line-height:1.6;min-height:38px;transition:opacity .3s}
 
 /* ── RESULTS ── */
 #results{background:var(--bg)}
@@ -215,7 +234,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .s-card{cursor:pointer}
 .s-feedback{display:flex;flex-direction:column;gap:6px;align-items:center;margin-left:4px}
 .s-feedback-lbl{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:1px;white-space:nowrap}
-.fit-btn{width:36px;height:28px;border-radius:7px;border:1.5px solid var(--rule);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;color:var(--muted);letter-spacing:.5px}
+.fit-btn{position:relative;width:36px;height:28px;border-radius:7px;border:1.5px solid var(--rule);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;color:var(--muted);letter-spacing:.5px}
 .fit-btn:hover{border-color:var(--ink);color:var(--ink)}
 .fit-btn.yes.selected{background:var(--c5);border-color:var(--c5);color:var(--cream)}
 .fit-btn.no.selected{background:var(--c1);border-color:var(--c1);color:var(--ink)}
@@ -243,6 +262,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 .btn-share{flex:1;min-width:150px;padding:16px 20px;border-radius:8px;border:2px solid var(--c5);background:var(--c5);color:var(--cream);font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;cursor:pointer;transition:all .2s}
 .btn-share:hover{filter:brightness(.88)}
 .disclaimer{font-size:11px;color:var(--muted);line-height:1.6;margin-top:28px;padding:14px 18px;background:rgba(0,0,0,.03);border-radius:8px;border:1px solid var(--rule);text-align:center}
+
+/* ── HEALTH CHECK (?health=1) ── */
+#health{background:#171a3d;align-items:center;justify-content:center;padding:0 20px}
+.health-inner{width:100%;max-width:460px;padding:40px 0}
+.health-logo{width:76px;margin-bottom:26px;color:var(--cream)}
+.health-title{font-family:'Bebas Neue',sans-serif;font-size:34px;color:var(--cream);margin-bottom:18px;letter-spacing:1px}
+.health-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.health-wait{font-size:13px;color:#9a9cb0;padding:14px 0}
+.health-row{display:flex;align-items:flex-start;gap:12px;padding:13px 15px;border-radius:10px;border:1.5px solid rgba(247,244,239,.12);background:rgba(247,244,239,.04)}
+.health-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.health-name{font-size:13px;font-weight:500;color:var(--cream);line-height:1.4}
+.health-status{font-size:12px;color:#9a9cb0;margin-top:3px;line-height:1.5}
+.health-ms{font-size:11px;color:#5b5f72;margin-top:2px;font-family:'DM Mono',monospace}
+.health-banner{padding:14px 16px;border-radius:10px;font-size:13px;font-weight:500;margin-bottom:14px;line-height:1.5}
+.health-stamp{font-family:'DM Mono',monospace;font-size:11px;color:#5b5f72;margin-bottom:18px;text-align:center}
 
 /* ── MODALS (welcome popup + dealbreaker suggestion) ── */
 #welcomeOverlay,#dbOverlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10002;display:none;align-items:center;justify-content:center;padding:20px}
@@ -298,6 +332,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
+
+<!-- HEALTH CHECK (opened with ?health=1 — not linked from anywhere in the app) -->
+<div id="health" class="screen">
+  <div class="health-inner">
+    <div class="health-logo"><svg class="wm" role="img" aria-label="next4"><use href="#wm"/></svg></div>
+    <div class="health-title">System check</div>
+    <div class="health-rows" id="healthRows"><div class="health-wait">Checking every connection…</div></div>
+    <div class="health-stamp" id="healthStamp"></div>
+    <button class="modal-btn" style="max-width:280px;margin:0 auto" onclick="runHealthCheck()">CHECK AGAIN</button>
+  </div>
+</div>
 
 <!-- SPLASH -->
 <div id="splash" class="screen active">
@@ -518,6 +563,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-
       <div class="load-step" id="ls7"><div class="step-ck">✓</div><span>Comparing academic programs...</span></div>
       <div class="load-step" id="ls8"><div class="step-ck">✓</div><span>Your matches are almost ready...</span></div>
     </div>
+    <div class="load-note" id="loadNote"></div>
   </div>
 </div>
 
@@ -1062,6 +1108,51 @@ function buildDeck(){
 function init(){
   buildDeck();
   document.getElementById('totalCount').textContent=`${cards.length} cards across ${SECTION_ORDER.length} categories`;
+  // Private diagnostics: /?health=1 — not linked from anywhere in the app.
+  if(/[?&]health=1\b/.test(window.location.search)){
+    showScreen('health');
+    runHealthCheck();
+  }
+}
+
+// ── HEALTH CHECK ─────────────────────────────────────────────
+// Every external service this app uses fails SOFT: matching still returns a
+// full set of results whether or not Supabase, Scorecard or BEA answered. That
+// protects students, but it also means an outage is invisible from inside the
+// app — which is exactly how feedback storage stayed broken for two days in
+// August 2026 without anyone noticing. This screen makes the true state of
+// every dependency visible in about three seconds, from a phone, without
+// opening a logs dashboard.
+async function runHealthCheck(){
+  const rows=document.getElementById('healthRows');
+  const stamp=document.getElementById('healthStamp');
+  rows.innerHTML='<div class="health-wait">Checking every connection…</div>';
+  stamp.textContent='';
+  try{
+    const res=await fetch('/api/health',{cache:'no-store'});
+    const d=await res.json();
+    const OK='#2e9e73', BAD='#f26b4e', WARN='#9a9cb0';
+    const banner=d.ok
+      ? `<div class="health-banner" style="background:rgba(46,158,115,.16);color:#2e9e73">Everything is connected.</div>`
+      : d.servingStudents
+        ? `<div class="health-banner" style="background:rgba(242,107,78,.14);color:#f26b4e">Students can still get matches, but something below is degraded.</div>`
+        : `<div class="health-banner" style="background:rgba(242,107,78,.2);color:#f26b4e">Matching is DOWN. Fix the required item below.</div>`;
+    rows.innerHTML = banner + Object.entries(d.checks).map(([k,c])=>{
+      const colour = c.ok ? OK : (c.required ? BAD : WARN);
+      return `<div class="health-row">
+        <div class="health-dot" style="background:${colour}"></div>
+        <div>
+          <div class="health-name">${escapeHtml(d.labels[k]||k)}</div>
+          <div class="health-status">${escapeHtml(c.status||'')}${c.detail?' — '+escapeHtml(c.detail):''}</div>
+          ${Number.isFinite(c.ms)?`<div class="health-ms">${c.ms} ms</div>`:''}
+        </div>
+      </div>`;
+    }).join('');
+    stamp.textContent='Checked '+new Date(d.checkedAt).toLocaleTimeString();
+  }catch(err){
+    rows.innerHTML=`<div class="health-banner" style="background:rgba(242,107,78,.2);color:#f26b4e">Couldn't reach /api/health — the site itself may not be deployed.</div>
+      <div class="health-status">${escapeHtml(err.toString())}</div>`;
+  }
 }
 
 function showScreen(id){
@@ -1274,11 +1365,71 @@ function finishSorting(){
   startLoading();
 }
 
+// ── LOADING SCREEN ───────────────────────────────────────────
+// A real match takes roughly 30-60 seconds: two model calls plus live College
+// Scorecard lookups for every candidate school. The old version ran a fixed
+// 8-second animation that ticked all 8 steps "done" and then sat there, fully
+// complete, for another ~55 seconds. Production logs caught a real request that
+// took 64s — so that student watched a finished checklist for almost a minute
+// with no sign anything was still happening, which reads as a frozen app.
+//
+// Now the screen is tied to the actual request: steps advance at a realistic
+// pace, the current one pulses, the final step only completes when the data
+// genuinely arrives, and a reassurance line appears if it runs long. Nothing
+// claims to be finished before it is.
+const LOAD_STEPS=['ls1','ls2','ls3','ls4','ls5','ls6','ls7','ls8'];
+let _loadTimers=[];
+
+function clearLoadTimers(){ _loadTimers.forEach(clearTimeout); _loadTimers=[]; }
+
+function resetLoadingScreen(){
+  clearLoadTimers();
+  LOAD_STEPS.forEach(id=>{
+    const el=document.getElementById(id);
+    el.classList.remove('done'); el.classList.remove('active');
+  });
+  const note=document.getElementById('loadNote');
+  if(note) note.textContent='';
+}
+
+// Marks every step complete — called only once real results are in hand.
+function completeLoadingSteps(){
+  clearLoadTimers();
+  LOAD_STEPS.forEach(id=>{
+    const el=document.getElementById(id);
+    el.classList.add('done'); el.classList.remove('active');
+  });
+  const note=document.getElementById('loadNote');
+  if(note) note.textContent='';
+}
+
 function startLoading(){
   showScreen('loading');
-  const steps=['ls1','ls2','ls3','ls4','ls5','ls6','ls7','ls8'];
-  steps.forEach((id,i)=>setTimeout(()=>document.getElementById(id).classList.add('done'),(i*1100)+400));
-  setTimeout(callBackend,2000);
+  resetLoadingScreen();
+
+  // Steps 1-7 tick over ~28s. Step 8 is deliberately left pending: it's the one
+  // that means "results are here," so only completeLoadingSteps() may finish it.
+  const paced=LOAD_STEPS.slice(0,-1);
+  const gap=4000;
+  document.getElementById(paced[0]).classList.add('active');
+  paced.forEach((id,i)=>{
+    _loadTimers.push(setTimeout(()=>{
+      document.getElementById(id).classList.remove('active');
+      document.getElementById(id).classList.add('done');
+      const next=LOAD_STEPS[i+1];
+      if(next) document.getElementById(next).classList.add('active');
+    },(i+1)*gap));
+  });
+
+  // Honest reassurance if it runs long, so a slow match never reads as a hang.
+  const note=document.getElementById('loadNote');
+  if(note){
+    _loadTimers.push(setTimeout(()=>{ note.textContent='This usually takes about 30 to 60 seconds. Hang tight, we\'re checking real data on every school.'; },12000));
+    _loadTimers.push(setTimeout(()=>{ note.textContent='Still working. We\'re verifying costs, sizes and admissions data school by school.'; },35000));
+    _loadTimers.push(setTimeout(()=>{ note.textContent='Almost there. Putting your final list in order.'; },55000));
+  }
+
+  callBackend();
 }
 
 // "Take another look" puts the student's "Doesn't Matter" cards back in front of
@@ -1334,8 +1485,12 @@ async function callBackend(){
     Object.entries(mustByCat).forEach(([c,a])=>dim[c]=(dim[c]||0)+a.length*2);
     Object.entries(likeByCat).forEach(([c,a])=>dim[c]=(dim[c]||0)+a.length);
     const topCats=Object.entries(dim).sort((a,b)=>b[1]-a[1]).slice(0,2).map(e=>e[0]);
-    showResults(data.schools,must,like,null,topCats);
+    // Only now is the checklist truthfully finished. Brief beat so the final
+    // tick is visible rather than flashing straight past.
+    completeLoadingSteps();
+    setTimeout(()=>showResults(data.schools,must,like,null,topCats),450);
   }catch(err){
+    completeLoadingSteps();
     showResults(null,[],[],err.toString());
   }
 }
@@ -1365,10 +1520,10 @@ function showResults(schools,must,like,error,topCats){
     </div>`).join('');
   const pl=document.getElementById('prioLine'); if(pl) pl.textContent=(topCats&&topCats.length)?('Your top priorities: '+topCats.join(' & ')):'';
   document.getElementById('pills').innerHTML=
-    must.map(p=>`<div class="pill pill-must">★ ${p}</div>`).join('');
+    must.map(p=>`<div class="pill pill-must">★ ${escapeHtml(p)}</div>`).join('');
   const list=document.getElementById('schoolsList');
   if(error||!schools){
-    list.innerHTML=`<div class="err-box"><strong>Could not load your matches.</strong><br>Something went wrong reaching our matching service.<br><br><button class="btn-sec" onclick="retryMatch()">RETRY</button><br><br><small style="opacity:.55">${error||'Unknown error'}</small></div>`;
+    list.innerHTML=`<div class="err-box"><strong>Could not load your matches.</strong><br>Something went wrong reaching our matching service.<br><br><button class="btn-sec" onclick="retryMatch()">RETRY</button><br><br><small style="opacity:.55">${escapeHtml(error||'Unknown error')}</small></div>`;
     return;
   }
   // One ID per completed match, shared by every yes/no feedback row this results
@@ -1384,20 +1539,28 @@ function fitColor(pct){ return pct>=80?'#2e9e73':pct>=65?'#2e357f':pct>=50?'#5b5
 // Builds the inner HTML for one school card given its position on screen
 // (pos, 0-based, drives the rank number + element IDs) and which school from
 // the full pool currently occupies that slot (schoolIdx, into _sharedSchools).
+// SECURITY: everything below originates from the AI model, so every field is run
+// through escapeHtml before being injected as innerHTML. The model is our own and
+// this isn't attacker-controlled today, but a model that ever emitted a stray tag
+// would otherwise have it executed as live markup inside the app. Numbers are
+// coerced with Number() rather than escaped, so a non-numeric value can't slip
+// into a style attribute either.
 function schoolCardInnerHtml(schoolIdx,pos){
   const s=_sharedSchools[schoolIdx]; if(!s) return '';
+  const pct=Number(s.fitPercent)||0;
+  const adm=['Likely','Target','Reach'].includes(s.admissibility)?s.admissibility:'';
   return `
-    <div class="s-bar-wrap"><div class="s-bar" style="width:0%;background:${fitColor(s.fitPercent)}" data-pct="${s.fitPercent}"></div></div>
+    <div class="s-bar-wrap"><div class="s-bar" style="width:0%;background:${fitColor(pct)}" data-pct="${pct}"></div></div>
     <div class="s-inner">
       <div class="s-rank">${String(pos+1).padStart(2,'0')}</div>
       <div class="s-info">
-        <div class="s-name">${s.name}</div>
-        <div class="s-loc">📍 ${s.location}</div>
-        ${s.admissibility?`<span class="s-adm" style="display:inline-block;margin-top:6px;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;color:${s.admissibility==='Reach'?'#171a3d':'#f7f4ef'};background:${s.admissibility==='Likely'?'#2e9e73':s.admissibility==='Reach'?'#f26b4e':'#2e357f'}">${s.admissibility.toUpperCase()}</span>`:''}
-        <div class="s-tags">${(Array.isArray(s.tags)?s.tags:(s.tags&&typeof s.tags==='object'?Object.values(s.tags):[])).filter(Boolean).map(t=>`<span class="s-tag">${t}</span>`).join('')}</div>
+        <div class="s-name">${escapeHtml(s.name)}</div>
+        <div class="s-loc">📍 ${escapeHtml(s.location)}</div>
+        ${adm?`<span class="s-adm" style="display:inline-block;margin-top:6px;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;color:${adm==='Reach'?'#171a3d':'#f7f4ef'};background:${adm==='Likely'?'#2e9e73':adm==='Reach'?'#f26b4e':'#2e357f'}">${escapeHtml(adm.toUpperCase())}</span>`:''}
+        <div class="s-tags">${(Array.isArray(s.tags)?s.tags:(s.tags&&typeof s.tags==='object'?Object.values(s.tags):[])).filter(Boolean).map(t=>`<span class="s-tag">${escapeHtml(t)}</span>`).join('')}</div>
       </div>
       <div class="s-pct">
-        <div class="s-pct-num" style="color:${fitColor(s.fitPercent)}">${s.fitPercent}%</div>
+        <div class="s-pct-num" style="color:${fitColor(pct)}">${pct}%</div>
         <div class="s-pct-lbl">FIT SCORE</div>
       </div>
       <div class="s-feedback">
@@ -1486,13 +1649,9 @@ function recordFit(evt,pos,response){
   }
 }
 
-function retryMatch(){
-  showScreen('loading');
-  document.querySelectorAll('.load-step').forEach(s=>s.classList.remove('done'));
-  const steps=['ls1','ls2','ls3','ls4','ls5','ls6','ls7','ls8'];
-  steps.forEach((id,i)=>setTimeout(()=>document.getElementById(id).classList.add('done'),(i*300)+200));
-  setTimeout(callBackend,600);
-}
+// Retry runs the exact same honest loading flow — no separate, faster fake
+// animation that would finish before the retry actually completes.
+function retryMatch(){ startLoading(); }
 
 // ── SHARE ────────────────────────────────────────────────────
 let _sharedSchools=[];
@@ -1503,15 +1662,17 @@ function shareResults(){
   // swaps), not just the raw backend order — this is what the student has
   // actually been looking at.
   const top5=(_visible||[]).slice(0,5).map(idx=>_sharedSchools[idx]).filter(Boolean);
-  document.getElementById('shareTop5').innerHTML=top5.map((s,i)=>`
+  document.getElementById('shareTop5').innerHTML=top5.map((s,i)=>{
+    const pct=Number(s.fitPercent)||0;
+    return `
     <div class="share-row">
       <div class="share-rank">${String(i+1).padStart(2,'0')}</div>
       <div class="share-info">
-        <div class="share-name">${s.name}</div>
-        <div class="share-loc">${s.location}</div>
+        <div class="share-name">${escapeHtml(s.name)}</div>
+        <div class="share-loc">${escapeHtml(s.location)}</div>
       </div>
-      <div class="share-pct" style="color:${fitColor(s.fitPercent)}">${s.fitPercent}%</div>
-    </div>`).join('');
+      <div class="share-pct" style="color:${fitColor(pct)}">${pct}%</div>
+    </div>`;}).join('');
   document.getElementById('shareOverlay').classList.add('active');
 }
 
@@ -1540,7 +1701,7 @@ function retakeSort(){
   placements={};idx=0;toastShown=false;
   _suggestShown=false; // fresh sort — the suggestion is eligible to show again
   buildDeck();
-  document.querySelectorAll('.load-step').forEach(s=>s.classList.remove('done'));
+  resetLoadingScreen(); // also cancels in-flight step timers from an abandoned load
   showScreen('sorting');
   renderCard();
 }
@@ -1558,7 +1719,7 @@ function resetApp(){
   closeSchoolDetail();
   intakeData={location:'',gpa:'',gpaScale:'',testType:'',testScore:'',budget:'',major:[],grade:'',income:''};
   buildDeck();
-  document.querySelectorAll('.load-step').forEach(s=>s.classList.remove('done'));
+  resetLoadingScreen(); // also cancels in-flight step timers from an abandoned load
   document.getElementById('q1').value='';
   document.getElementById('q2').value='';
   document.getElementById('q3-type').value='';
