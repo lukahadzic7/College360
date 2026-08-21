@@ -59,17 +59,87 @@ async function probeTable(base, key, table) {
   }
 }
 
+// The models this app actually uses. Kept in sync with match.js by hand — the
+// point of this probe is to prove THESE model names are callable by THIS key,
+// so pointing it at anything else would defeat the purpose.
+const MODEL_FINAL = 'claude-opus-4-5';
+const MODEL_CANDIDATES = 'claude-haiku-4-5-20251001';
+
+// A deliberately tiny live request: 1 token out, one-character prompt. Costs a
+// fraction of a cent and takes about a second, but it exercises the real path —
+// key validity, account standing, and crucially tier access to this model.
+async function probeModel(model, apiKey) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({ model, max_tokens: 1, messages: [{ role: 'user', content: '.' }] }),
+    });
+    if (resp.ok) return { ok: true, detail: '' };
+    const body = await resp.json().catch(() => ({}));
+    const msg = (body && body.error && body.error.message) ? body.error.message : `HTTP ${resp.status}`;
+    // Anthropic returns "credit balance is too low" for three different causes.
+    // Say so, rather than sending someone to check a balance that's already fine.
+    const overloaded = /credit balance/i.test(msg);
+    return {
+      ok: false,
+      detail: overloaded
+        ? `${msg} — NOTE: this same message is returned when the account tier cannot access "${model}", or when the key is stale. Check model access and try a freshly minted key before assuming it's billing.`
+        : msg,
+    };
+  } catch (e) {
+    return { ok: false, detail: e && e.name === 'AbortError' ? 'No response within 6s' : `Network failure: ${e && e.message}` };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function probeAnthropic() {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { ok: false, status: 'ANTHROPIC_API_KEY missing', required: true };
+
+  const started = Date.now();
+  const [final, candidates] = await Promise.all([
+    probeModel(MODEL_FINAL, apiKey),
+    probeModel(MODEL_CANDIDATES, apiKey),
+  ]);
+  const ms = Date.now() - started;
+
+  if (final.ok && candidates.ok) {
+    return { ok: true, status: `both models responding (${MODEL_FINAL}, ${MODEL_CANDIDATES})`, ms, required: true };
+  }
+  // The final model is the one matching cannot live without; the shortlist model
+  // failing only costs the two-pass path, which degrades to single-pass.
+  const broken = !final.ok ? final : candidates;
+  const which = !final.ok ? MODEL_FINAL : MODEL_CANDIDATES;
+  return {
+    ok: false,
+    status: `${which} rejected`,
+    detail: broken.detail,
+    ms,
+    required: !final.ok,
+  };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
   const checks = {};
 
-  // Credential presence only — never the values themselves.
-  checks.matching = {
-    ok: !!process.env.ANTHROPIC_API_KEY,
-    status: process.env.ANTHROPIC_API_KEY ? 'key set' : 'ANTHROPIC_API_KEY missing',
-    required: true,
-  };
+  // The matching check makes a REAL call. An earlier version only reported
+  // whether the key existed, which was true and useless: on 2026-08-20 this
+  // screen would have shown "AI matching — key set" in green while every single
+  // match was failing, because the account tier had no access to the requested
+  // model. Key presence proves nothing. Only a real request proves the exact
+  // model this app uses can actually be called by this exact key.
+  checks.matching = await probeAnthropic();
   checks.schoolData = {
     ok: !!process.env.SCORECARD_API_KEY,
     status: process.env.SCORECARD_API_KEY ? 'key set' : 'SCORECARD_API_KEY missing — results fall back to model knowledge',
