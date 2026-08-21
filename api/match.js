@@ -311,6 +311,12 @@ FINAL SELF-CHECK before returning - verify ALL of these and fix anything that fa
         schools = twoPass.schools;
         prefetched = twoPass.byName;
       } catch (e) {
+        // If pass 1 died on something retrying can't fix (bad key, no model
+        // access for this tier, billing), the single-pass fallback would fail
+        // exactly the same way — it uses the same key and the same account.
+        // Fail immediately with the real reason instead of doubling the work
+        // and the wait before showing the user an error.
+        if (e && /not retryable/.test(String(e.message))) throw e;
         console.warn('Two-pass failed; falling back to single pass:', e && e.message);
         schools = null;
         prefetched = null;
@@ -733,6 +739,7 @@ function fmtK(n) { return Math.round(n / 1000) + 'K'; }
 export const MAX_TOKENS_FINAL = 16000;      // pass 2 / single-pass final 15-school selection (was 11000)
 export const MAX_TOKENS_CANDIDATES = 2500;  // pass 1 candidate-name list (was 1500; cheap extra headroom)
 export const CLAUDE_CALL_ATTEMPTS = 3;      // 1 initial + 2 retries, per the approved reliability plan
+export const ANTHROPIC_TIMEOUT_MS = 90000;  // per-attempt ceiling; 3 attempts still fit inside Vercel's 300s budget
 
 // ============================================================================
 // MODELS (upgraded 2026-08-20, pre-App-Store)
@@ -754,8 +761,28 @@ export const CLAUDE_CALL_ATTEMPTS = 3;      // 1 initial + 2 retries, per the ap
 // latency lever if matches ever need to get faster; lowering it trades some
 // reasoning depth for speed, so it should be measured before being changed.
 // ============================================================================
-export const MODEL_FINAL = 'claude-opus-5';       // final 15-school selection (quality-critical)
-export const MODEL_CANDIDATES = 'claude-sonnet-5'; // pass 1 shortlist of real school names (speed-critical)
+// ---------------------------------------------------------------------------
+// REVERTED 2026-08-20, SAME DAY, AFTER A LIVE OUTAGE.
+// Switching to opus-5 / sonnet-5 took production down. Every request failed with
+// Anthropic 400 "Your credit balance is too low" — while the account held $82 in
+// cleared credits. That error string is overloaded: Anthropic returns it for
+// actual depletion, for a STALE KEY, *and* for requesting a model the account's
+// usage tier can't access. This was the third case. Matches on opus-4-5 at 21:18
+// succeeded; every match after the opus-5 deploy at ~21:41 failed.
+//
+// Lesson, recorded so it isn't repeated: a model swap is not a safe same-day
+// change. Model access depends on account tier, which cannot be verified from
+// the code — only by making a real call with the real key. Any future upgrade
+// gets proven against this exact key on a preview deployment BEFORE it reaches
+// production, never on launch day.
+//
+// These two are the exact models that were serving successfully. They remain
+// Active; per Anthropic's deprecation table they retire not sooner than Nov 24
+// 2026 (opus-4-5) and Oct 15 2026 (haiku-4-5), so there is real headroom to do
+// the upgrade properly, verified, well before either date.
+// ---------------------------------------------------------------------------
+export const MODEL_FINAL = 'claude-opus-4-5';                // final 15-school selection (quality-critical)
+export const MODEL_CANDIDATES = 'claude-haiku-4-5-20251001'; // pass 1 shortlist of real school names (fast/cheap)
 
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
@@ -829,9 +856,16 @@ export async function callClaudeForJson(apiKey, model, prompt, maxTokens, attemp
   let lastText = '';
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
+    // Hard per-call ceiling. Without this a hung Anthropic connection just sits
+    // there: on 2026-08-20 one request consumed Vercel's entire 300s budget and
+    // died with a runtime timeout instead of returning anything useful. Retries
+    // are worthless if a single attempt can eat the whole request.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ANTHROPIC_TIMEOUT_MS);
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
@@ -841,7 +875,29 @@ export async function callClaudeForJson(apiKey, model, prompt, maxTokens, attemp
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error('Anthropic ' + response.status + ': ' + JSON.stringify(err));
+        const detail = (err && err.error && err.error.message) ? err.error.message : JSON.stringify(err);
+
+        // FAIL FAST on anything retrying cannot possibly fix: bad key, no model
+        // access for this account tier, billing, malformed request. Retrying a
+        // 400 six times (3 here, 3 more in the single-pass fallback) is exactly
+        // what turned an instant, self-explanatory billing error into a slow and
+        // confusing outage. 408/429 stay retryable — those are transient.
+        if (response.status >= 400 && response.status < 500 &&
+            response.status !== 408 && response.status !== 429) {
+          console.error(JSON.stringify({
+            event: 'anthropic_fatal',
+            status: response.status,
+            model,
+            message: detail,
+            hint: /credit balance/i.test(detail)
+              ? 'Anthropic returns this for THREE different causes: real credit depletion, an account tier without access to this model, or a stale API key. Check model access and key validity before assuming billing.'
+              : 'Not retryable — fix the request or the credentials.',
+            ts: new Date().toISOString(),
+          }));
+          throw new Error('Anthropic ' + response.status + ' (not retryable): ' + detail);
+        }
+
+        throw new Error('Anthropic ' + response.status + ': ' + detail);
       }
       const data = await response.json();
       let text = (data.content || []).map(b => b.text || '').join('');
@@ -859,10 +915,18 @@ export async function callClaudeForJson(apiKey, model, prompt, maxTokens, attemp
       }));
     } catch (e) {
       lastErr = e;
+      // Surface unretryable failures straight to the caller. Without this the
+      // loop swallowed them and burned every remaining attempt on a request
+      // that could never succeed.
+      if (e && /not retryable/.test(String(e.message))) throw e;
       console.warn(JSON.stringify({
         event: 'claude_call_retry', attempt, attempts, model,
-        message: e && e.message, ts: new Date().toISOString(),
+        message: e && e.message,
+        timedOut: !!(e && e.name === 'AbortError'),
+        ts: new Date().toISOString(),
       }));
+    } finally {
+      clearTimeout(timer);
     }
     if (attempt < attempts) await sleep(400 * attempt); // brief backoff before the next fresh attempt
   }
